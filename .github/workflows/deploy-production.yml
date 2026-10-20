@@ -85,7 +85,8 @@ jobs:
         run: |
           set -euo pipefail
           owner=${GITHUB_REPOSITORY%%/*}
-          image="ghcr.io/${owner,,}/sub2api:${RELEASE_TAG}"
+          version="${RELEASE_TAG#v}"
+          image="ghcr.io/${owner,,}/sub2api:${version}"
           manifest="$RUNNER_TEMP/image-manifest.json"
           docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' > "$manifest"
           digest=$(jq -r '.digest // empty' "$manifest")
