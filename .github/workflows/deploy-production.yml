@@ -20,7 +20,7 @@ permissions:
   packages: read
 
 env:
-  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || inputs.tag || '' }}
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
 
 jobs:
   deploy:
@@ -50,13 +50,11 @@ jobs:
 
           if [[ -n "${{ inputs.tag }}" ]]; then
             latest_tag="${{ inputs.tag }}"
+            RELEASE_SHA=$(git rev-parse --verify "refs/tags/${latest_tag}^{commit}")
           else
             latest_tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')
+            [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid workflow_run.head_sha"; exit 1; }
           fi
-          if [[ -z "$RELEASE_SHA" ]]; then
-            RELEASE_SHA=$(git rev-parse --verify "refs/tags/${latest_tag}^{commit}")
-          fi
-          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release sha"; exit 1; }
           if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::notice::Skipping production deploy: latest release '${latest_tag}' is not a stable vMAJOR.MINOR.PATCH tag"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
