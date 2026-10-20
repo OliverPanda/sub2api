@@ -705,6 +705,32 @@ go generate ./cmd/server
 
 ---
 
+## Production Release Flow (Zero-Button)
+
+Once the production environment is initialized (see [deploy/ops/production/README.md](deploy/ops/production/README.md)), every subsequent release is fully automated:
+
+```bash
+git checkout main
+git pull origin main
+git tag -a v0.2.19 -m "release v0.2.19"
+git push origin main v0.2.19
+```
+
+That single `git push` triggers the full pipeline:
+
+1. **Release workflow** builds the frontend and Go binaries for all platforms, builds and pushes the multi-arch image to GHCR, and publishes the GitHub Release.
+2. **Deploy Production workflow** automatically triggers after Release succeeds, validates the release gate, resolves the immutable image digest, syncs Cloudflare DNS/TLS, joins Tailscale, and SSHes into the production server.
+3. The server backs up PostgreSQL, pulls the digest-pinned image, rebuilds the container, waits for health checks, and runs a public smoke test.
+4. On failure the previous image is restored automatically. On success the site is live within about a minute.
+
+No clicks, no SSH, no manual approval. Monitor progress under [Actions](https://github.com/OliverPanda/sub2api/actions).
+
+If a deploy fails, you can re-run **Deploy Production** directly from the Actions page (Run workflow → tag name) without re-pushing the tag.
+
+Full pipeline description, server bootstrap, Cloudflare/Tailscale setup, secrets, and rollback details live in [deploy/ops/production/README.md](deploy/ops/production/README.md).
+
+---
+
 ## Simple Mode
 
 Simple Mode is designed for individual developers or internal teams who want quick access without full SaaS features.
