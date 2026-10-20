@@ -1,0 +1,156 @@
+# Production single-host deployment for Sub2API.
+# The application is rebuilt by scripts/deploy-release.sh with a digest-pinned image.
+name: sub2api
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    depends_on:
+      sub2api:
+        condition: service_healthy
+    ports:
+      - "443:443"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-api.xddapi.org.uk}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro
+      - ./caddy/origin.pem:/etc/caddy/certs/origin.pem:ro
+      - ./caddy/origin.key:/etc/caddy/certs/origin.key:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    networks:
+      edge:
+        ipv4_address: 172.30.0.10
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 10s
+    logging: *default-logging
+
+  sub2api:
+    image: ${SUB2API_IMAGE:?SUB2API_IMAGE must be pinned by deploy-release.sh}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+    env_file:
+      - .env
+    environment:
+      AUTO_SETUP: "true"
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8080"
+      SERVER_TRUSTED_PROXIES: "172.30.0.10/32"
+      SECURITY_TRUST_FORWARDED_IP_FOR_API_KEY_ACL: "false"
+      DATABASE_HOST: "postgres"
+      DATABASE_PORT: "5432"
+      DATABASE_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      DATABASE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      DATABASE_DBNAME: "${POSTGRES_DB:?POSTGRES_DB is required}"
+      DATABASE_SSLMODE: "disable"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_USERNAME: "${REDIS_USERNAME:-}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+      REDIS_ENABLE_TLS: "false"
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    stop_grace_period: 45s
+    logging: *default-logging
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    shm_size: 256mb
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-300}
+    volumes:
+      # PostgreSQL 18's official image uses /var/lib/postgresql as the
+      # persistent root and a version-specific PGDATA beneath it.
+      - ./postgres_data:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    stop_grace_period: 60s
+    logging: *default-logging
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    command:
+      - sh
+      - -ec
+      - |
+        exec redis-server \
+          --appendonly yes \
+          --appendfsync everysec \
+          --save 60 1 \
+          --requirepass "$${REDIS_PASSWORD}"
+    volumes:
+      - ./redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    stop_grace_period: 30s
+    logging: *default-logging
+
+networks:
+  edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  backend:
+    driver: bridge
+    internal: true

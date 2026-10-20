@@ -1,0 +1,202 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+concurrency:
+  group: sub2api-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout trusted deployment tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release gate
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid workflow_run.head_sha"; exit 1; }
+          [[ "$DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "Invalid default branch"; exit 1; }
+
+          latest_tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')
+          if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::Skipping production deploy: latest release '${latest_tag}' is not a stable vMAJOR.MINOR.PATCH tag"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          tag_sha=$(git rev-parse --verify "refs/tags/${latest_tag}^{commit}")
+          if [[ "$tag_sha" != "$RELEASE_SHA" ]]; then
+            echo "::notice::Skipping ${latest_tag}; its commit ${tag_sha} does not match completed Release run ${RELEASE_SHA}"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # checkout uses fetch-depth 0, so the default-branch history and
+          # release tags are already available without a second authenticated
+          # fetch (persist-credentials is intentionally disabled).
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" HEAD; then
+            echo "::notice::Skipping ${latest_tag}; commit ${RELEASE_SHA} is not reachable from ${DEFAULT_BRANCH}"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+          echo "Production release gate passed for ${latest_tag} -> ${tag_sha}"
+
+      - name: Log in to GHCR
+        if: steps.gate.outputs.deploy == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve immutable image digest
+        if: steps.gate.outputs.deploy == 'true'
+        id: image
+        env:
+          RELEASE_TAG: ${{ steps.gate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          owner=${GITHUB_REPOSITORY%%/*}
+          image="ghcr.io/${owner,,}/sub2api:${RELEASE_TAG}"
+          manifest="$RUNNER_TEMP/image-manifest.json"
+          docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' > "$manifest"
+          digest=$(jq -r '.digest // empty' "$manifest")
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            cat "$manifest" >&2
+            echo "Could not resolve a valid image digest for ${image}" >&2
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Production image::${image}@${digest}"
+
+      - name: Ensure Cloudflare DNS and TLS mode
+        if: steps.gate.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_DNS_REQUIRED: "true"
+          CLOUDFLARE_CONFIGURE_ZONE: "true"
+          CLOUDFLARE_DNS_RECORD_NAME: ${{ vars.CLOUDFLARE_DNS_RECORD_NAME || 'api.xddapi.org.uk' }}
+          ORIGIN_IPV4: ${{ vars.ORIGIN_IPV4 || '149.104.31.126' }}
+          ORIGIN_IPV6: ${{ vars.ORIGIN_IPV6 || '2001:df1:7880:2::3a7' }}
+        run: bash deploy/ops/production/scripts/sync-cloudflare-dns.sh
+
+      - name: Join Tailscale network
+        if: steps.gate.outputs.deploy == 'true'
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy with digest-pinned image over restricted SSH
+        if: steps.gate.outputs.deploy == 'true'
+        id: deploy
+        env:
+          RELEASE_TAG: ${{ steps.gate.outputs.tag }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER || 'sub2api-deploy' }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT || '22' }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          for name in PROD_SSH_HOST PROD_SSH_USER PROD_SSH_PORT PROD_SSH_KEY PROD_SSH_KNOWN_HOSTS IMAGE_DIGEST; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required configuration: ${name}" >&2
+              exit 1
+            fi
+          done
+          [[ "$PROD_SSH_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] || { echo "Invalid PROD_SSH_HOST" >&2; exit 1; }
+          [[ "$PROD_SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "Invalid PROD_SSH_USER" >&2; exit 1; }
+          [[ "$PROD_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "Invalid PROD_SSH_PORT" >&2; exit 1; }
+
+          key="$RUNNER_TEMP/sub2api-prod-key"
+          known_hosts="$RUNNER_TEMP/sub2api-known-hosts"
+          printf '%s\n' "$PROD_SSH_KEY" > "$key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$known_hosts"
+          sed -i 's/\r$//' "$key" "$known_hosts"
+          chmod 0600 "$key" "$known_hosts"
+          ssh-keygen -y -f "$key" >/dev/null
+
+          ssh \
+            -F /dev/null \
+            -i "$key" \
+            -p "$PROD_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null \
+            -o UpdateHostKeys=no \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=20 \
+            -o LogLevel=ERROR \
+            "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
+            "deploy ${RELEASE_TAG} ${IMAGE_DIGEST} ${RELEASE_SHA}"
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        env:
+          RELEASE_TAG: ${{ steps.gate.outputs.tag }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          DEPLOY_TRIGGERED: ${{ steps.gate.outputs.deploy }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          status=${JOB_STATUS:-failure}
+          if [[ "$JOB_STATUS" == "success" && "$DEPLOY_TRIGGERED" != "true" ]]; then
+            status=skipped
+          fi
+          bash deploy/ops/production/scripts/notify-telegram.sh \
+            "$status" "${RELEASE_TAG:-unknown}" "${IMAGE_DIGEST:-unknown}" "$RUN_URL"
+
+      - name: Write deployment summary
+        if: always()
+        env:
+          RELEASE_TAG: ${{ steps.gate.outputs.tag }}
+          JOB_STATUS: ${{ job.status }}
+          DEPLOY_TRIGGERED: ${{ steps.gate.outputs.deploy }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          {
+            echo "## Sub2API production deployment"
+            echo
+            echo "- Release: \`${RELEASE_TAG:-unknown}\`"
+            echo "- Digest: \`${IMAGE_DIGEST:-unknown}\`"
+            echo "- Triggered: \`${DEPLOY_TRIGGERED:-false}\`"
+            echo "- Result: \`${JOB_STATUS:-unknown}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

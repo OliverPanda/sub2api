@@ -1,0 +1,78 @@
+{
+	auto_https off
+	admin off
+	persist_config off
+	servers {
+		max_header_size 64KB
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+		# Generated from Cloudflare's published IPv4/IPv6 egress ranges.
+		# Refresh with scripts/refresh-cloudflare-trusted-proxies.sh.
+		import /etc/caddy/cloudflare-trusted-proxies.caddy
+	}
+}
+
+{$PUBLIC_DOMAIN:api.xddapi.org.uk} {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key {
+		protocols tls1.2 tls1.3
+	}
+
+	reverse_proxy sub2api:8080 {
+		# Caddy only trusts CF-Connecting-IP when the TCP peer is in the
+		# Cloudflare ranges imported above. Origin firewall rules should also
+		# allow 443 only from those ranges.
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto https
+		header_up -CF-Connecting-IP
+
+		transport http {
+			keepalive 120s
+			keepalive_idle_conns 256
+			read_buffer 16KB
+			write_buffer 16KB
+			compression off
+		}
+
+		fail_duration 30s
+		max_fails 3
+		unhealthy_status 500 502 503 504
+	}
+
+	encode {
+		zstd
+		gzip 6
+		minimum_length 256
+		match {
+			# Do not use text/*: it would compress and buffer text/event-stream.
+			header Content-Type text/css*
+			header Content-Type text/csv*
+			header Content-Type text/html*
+			header Content-Type text/javascript*
+			header Content-Type text/markdown*
+			header Content-Type text/plain*
+			header Content-Type text/xml*
+			header Content-Type application/json*
+			header Content-Type application/javascript*
+			header Content-Type application/xml*
+			header Content-Type application/rss+xml*
+			header Content-Type image/svg+xml*
+		}
+	}
+
+	request_body {
+		max_size 256MB
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+
+	handle_errors {
+		respond "{err.status_code} {err.status_text}"
+	}
+}

@@ -20,6 +20,53 @@ jobs:
           /bin/sh deploy/tests/docker-compose-gateway-env-test.sh
           /bin/sh deploy/tests/docker-runtime-resources-test.sh
           /bin/sh deploy/test-caddyfile-cache.sh
+          /bin/bash -n deploy/ops/production/bootstrap-server.sh
+          for script in deploy/ops/production/scripts/*.sh; do
+            /bin/bash -n "$script"
+          done
+
+  production-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      - name: Run ShellCheck on production scripts
+        run: |
+          shellcheck -x \
+            deploy/ops/production/bootstrap-server.sh \
+            deploy/ops/production/scripts/*.sh
+      - name: Validate production Docker Compose
+        working-directory: deploy/ops/production
+        env:
+          SUB2API_IMAGE: ghcr.io/oliverpanda/sub2api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=test-postgres-password/' .env
+          sed -i 's/^REDIS_PASSWORD=$/REDIS_PASSWORD=test-redis-password/' .env
+          sed -i 's/^ADMIN_PASSWORD=$/ADMIN_PASSWORD=test-admin-password/' .env
+          sed -i 's/^JWT_SECRET=$/JWT_SECRET=test-jwt-secret/' .env
+          sed -i 's/^TOTP_ENCRYPTION_KEY=$/TOTP_ENCRYPTION_KEY=test-totp-key/' .env
+          printf 'SUB2API_IMAGE=%s\n' "$SUB2API_IMAGE" > release.env
+          docker compose --env-file .env --env-file release.env -f docker-compose.yml config --quiet
+      - name: Validate production Caddyfile
+        run: |
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/certs"
+          cp deploy/ops/production/Caddyfile "$tmp/Caddyfile"
+          cp deploy/ops/production/caddy/cloudflare-trusted-proxies.caddy "$tmp/cloudflare-trusted-proxies.caddy"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=api.xddapi.org.uk' \
+            -keyout "$tmp/certs/origin.key" \
+            -out "$tmp/certs/origin.pem" >/dev/null 2>&1
+          docker run --rm \
+            -e PUBLIC_DOMAIN=api.xddapi.org.uk \
+            -v "$tmp/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -v "$tmp/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro" \
+            -v "$tmp/certs:/etc/caddy/certs:ro" \
+            caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile
 
   test:
     runs-on: ubuntu-latest

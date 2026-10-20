@@ -1,0 +1,15 @@
+# Runtime secrets and state must never be committed.
+.env
+release.env*
+state/
+backups/
+logs/
+data/
+postgres_data/
+redis_data/
+caddy_data/
+caddy_config/
+
+# Cloudflare Origin CA private material.
+caddy/origin.pem
+caddy/origin.key
