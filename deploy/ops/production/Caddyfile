@@ -36,9 +36,12 @@
 			compression off
 		}
 
-		fail_duration 30s
-		max_fails 3
-		unhealthy_status 500 502 503 504
+		# This deployment has a single application backend. Application-level
+		# 5xx responses (for example, a monitored channel with no schedulable
+		# account) must not mark the whole gateway unhealthy and cause Caddy to
+		# reject unrelated traffic for 30 seconds. Keep passive health checks
+		# disabled; transport failures are still surfaced per request.
+		fail_duration 0
 	}
 
 	encode {
