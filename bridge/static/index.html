@@ -49,14 +49,6 @@
         <span id="quantity-hint" class="muted"></span>
       </div>
 
-      <div class="section-head compact">
-        <div>
-          <p class="eyebrow">STEP 2</p>
-          <h2>选择支付方式</h2>
-        </div>
-      </div>
-      <div id="channels" class="channel-grid" aria-live="polite"></div>
-
       <div class="summary">
         <div>
           <span class="muted">应付金额</span>
@@ -64,7 +56,7 @@
         </div>
         <button id="submit" class="primary" type="button">立即充值</button>
       </div>
-      <p class="fineprint">点击充值后将跳转到商城收银台。支付成功后由 Bridge 自动核验并充值；重复回调不会重复加余额。</p>
+      <p class="fineprint">档位不绑定支付渠道。确认金额后，系统会展示该档位当前可用的全部支付方式；支付成功后由 Bridge 自动核验并充值。</p>
     </section>
 
     <section id="payment" class="panel payment-panel hidden" aria-labelledby="payment-title">
@@ -85,6 +77,16 @@
           <a id="support-link" class="text-button support-link hidden" target="_blank" rel="noopener noreferrer">联系客服</a>
           <p id="payment-meta" class="muted"></p>
         </div>
+      </div>
+      <div id="payment-methods" class="payment-methods hidden" aria-live="polite">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">CHECKOUT</p>
+            <h3>选择该档位可用的支付方式</h3>
+          </div>
+          <span class="safe-badge">档位已锁定</span>
+        </div>
+        <div id="channels" class="channel-grid"></div>
       </div>
     </section>
 

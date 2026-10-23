@@ -8,7 +8,8 @@
   let skus = []
   let channels = []
   let selectedSku = null
-  let selectedChannelId = 0
+  let pendingOrder = null
+  let channelLoadError = ''
   let activeOrder = null
   let ordersCache = []
   const expandedOrders = new Set()
@@ -24,6 +25,7 @@
     quantityHint: $('quantity-hint'), totalPrice: $('total-price'), submit: $('submit'),
     payment: $('payment'), paymentStatus: $('payment-status'), paymentMessage: $('payment-message'),
     payLink: $('pay-link'), paymentMeta: $('payment-meta'), qrWrap: $('qr-wrap'), qrImage: $('qr-image'),
+    paymentMethods: $('payment-methods'),
     refreshPayment: $('refresh-payment'), consoleLink: $('console-link'), supportLink: $('support-link'),
     footerSupport: $('footer-support'), footerSupportHint: $('footer-support-hint'),
     orders: $('orders'), ordersSummary: $('orders-summary'), orderSearch: $('order-search'),
@@ -164,7 +166,7 @@
   }
 
   function updateSubmitState() {
-    ui.submit.disabled = busy || !selectedSku || !channels.length || !selectedChannelId
+    ui.submit.disabled = busy || !selectedSku
   }
 
   function supportMarkup() {
@@ -196,28 +198,25 @@
   }
 
   function renderChannels() {
+    if (!pendingOrder) return
     if (!channels.length) {
-      selectedChannelId = 0
-      ui.channels.innerHTML = `<div class="notice info"><strong>支付通道维护中</strong><p>账号登录和充值记录不受影响。支付通道恢复后，刷新本页即可充值。</p>${supportMarkup()}</div>`
-      updateSubmitState()
+      const title = channelLoadError ? '支付方式加载失败' : '支付通道维护中'
+      const detail = channelLoadError || '账号登录和充值记录不受影响。支付通道恢复后，刷新本页即可充值。'
+      ui.channels.innerHTML = `<div class="notice info"><strong>${escapeHTML(title)}</strong><p>${escapeHTML(detail)}</p><button class="text-button" type="button" data-retry-channels>重新获取支付方式</button>${supportMarkup()}</div>`
+      ui.channels.querySelector('[data-retry-channels]').addEventListener('click', refreshPaymentMethods)
       return
     }
-    if (!channels.some((channel) => channel.id === selectedChannelId)) selectedChannelId = channels[0].id
     ui.channels.innerHTML = channels.map((channel) => `
-      <button type="button" class="channel${channel.id === selectedChannelId ? ' selected' : ''}" data-channel="${channel.id}">
+      <button type="button" class="channel" data-channel="${channel.id}"${busy ? ' disabled' : ''}>
         <span class="channel-icon">${channelIcon(channel)}</span>
         <span class="channel-copy">
           <span class="channel-name">${escapeHTML(channel.name)}</span>
-          <span class="channel-type">${escapeHTML(channel.interaction_mode || channel.channel_type || '在线支付')}</span>
+          <span class="channel-type">${escapeHTML(channel.interaction_mode || channel.channel_type || '在线支付')} · 点击继续</span>
         </span>
       </button>`).join('')
     ui.channels.querySelectorAll('[data-channel]').forEach((button) => {
-      button.addEventListener('click', () => {
-        selectedChannelId = Number(button.dataset.channel)
-        renderChannels()
-      })
+      button.addEventListener('click', () => payWithChannel(pendingOrder, Number(button.dataset.channel)))
     })
-    updateSubmitState()
   }
 
   function renderOrders(orders) {
@@ -302,17 +301,10 @@
     ui.recharge.classList.remove('hidden')
   }
 
-  async function loadChannels() {
-    try {
-      const data = await api('api/payment-channels')
-      channels = data.channels || []
-      renderChannels()
-    } catch (error) {
-      channels = []
-      selectedChannelId = 0
-      ui.channels.innerHTML = `<div class="notice info"><strong>支付通道暂时不可用</strong><p>${escapeHTML(error.message)}</p>${supportMarkup()}</div>`
-      updateSubmitState()
-    }
+  async function loadPaymentChannels(order) {
+    const data = await api(`api/payment-channels?order_no=${encodeURIComponent(order.order_no)}`)
+    channels = data.channels || []
+    channelLoadError = ''
   }
 
   async function loadOrders() {
@@ -329,8 +321,130 @@
     return `ui-${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
 
+  function paymentRequired(order) {
+    return (order.status === 'created' || order.status === 'pending_payment') && !order.pay_url && !order.qr_code
+  }
+
+  async function requestPayment(order, channelId) {
+    const data = await api(`api/orders/${encodeURIComponent(order.order_no)}/pay`, {
+      method: 'POST',
+      body: JSON.stringify({ channel_id: channelId })
+    })
+    return data.order
+  }
+
+  function hidePaymentMethods() {
+    pendingOrder = null
+    channels = []
+    channelLoadError = ''
+    ui.channels.innerHTML = ''
+    ui.paymentMethods.classList.add('hidden')
+  }
+
+  function showAwaitingPayment(order, message = '') {
+    window.clearTimeout(pollTimer)
+    pendingOrder = order
+    activeOrder = order
+    ui.payment.classList.remove('hidden')
+    ui.paymentMethods.classList.remove('hidden')
+    ui.paymentStatus.textContent = '待支付'
+    ui.paymentStatus.className = 'status pending'
+    ui.paymentMessage.textContent = message || '充值档位已锁定，请选择下方任意可用支付方式完成付款。'
+    ui.paymentMeta.textContent = `${order.order_no} · 应付 ${moneyLabel(order.order_amount, order.currency)}`
+    ui.qrImage.removeAttribute('src')
+    ui.qrWrap.classList.add('hidden')
+    ui.payLink.removeAttribute('href')
+    ui.payLink.classList.add('hidden')
+    ui.consoleLink.classList.add('hidden')
+    ui.refreshPayment.classList.add('hidden')
+    ui.supportLink.classList.toggle('hidden', !supportUrl)
+    renderChannels()
+    ui.payment.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  async function preparePayment(order) {
+    channels = []
+    channelLoadError = ''
+    try {
+      await loadPaymentChannels(order)
+    } catch (error) {
+      channelLoadError = error.message
+    }
+    if (!channelLoadError && channels.length === 1) {
+      try {
+        const paid = await requestPayment(order, channels[0].id)
+        showOrder(paid)
+        return
+      } catch (error) {
+        channelLoadError = error.message
+        toast(error.message)
+      }
+    }
+    showAwaitingPayment(order, channelLoadError)
+  }
+
+  async function continueOrder(order) {
+    if (!paymentRequired(order)) {
+      showOrder(order)
+      return
+    }
+    const previousChannelId = Number(order.channel_id || 0)
+    if (previousChannelId > 0) {
+      try {
+        showOrder(await requestPayment(order, previousChannelId))
+        return
+      } catch (error) {
+        toast(error.message)
+      }
+    }
+    await preparePayment(order)
+  }
+
+  async function payWithChannel(order, channelId) {
+    if (busy || !order || !channelId) return
+    busy = true
+    updateSubmitState()
+    ui.channels.querySelectorAll('[data-channel]').forEach((button) => { button.disabled = true })
+    let failure = ''
+    try {
+      showOrder(await requestPayment(order, channelId))
+      await loadOrders()
+    } catch (error) {
+      failure = error.message
+      toast(error.message)
+    } finally {
+      busy = false
+      updateSubmitState()
+    }
+    if (failure && pendingOrder) showAwaitingPayment(pendingOrder, failure)
+  }
+
+  async function refreshPaymentMethods() {
+    if (busy || !pendingOrder) return
+    const order = pendingOrder
+    busy = true
+    updateSubmitState()
+    channels = []
+    channelLoadError = ''
+    try {
+      await loadPaymentChannels(order)
+      if (channels.length === 1) {
+        showOrder(await requestPayment(order, channels[0].id))
+        return
+      }
+      showAwaitingPayment(order)
+    } catch (error) {
+      channelLoadError = error.message
+      showAwaitingPayment(order, error.message)
+    } finally {
+      busy = false
+      updateSubmitState()
+      if (!ui.paymentMethods.classList.contains('hidden')) renderChannels()
+    }
+  }
+
   async function createPayment() {
-    if (busy || !selectedSku || !selectedChannelId) return
+    if (busy || !selectedSku) return
     busy = true
     updateSubmitState()
     ui.submit.textContent = '正在创建订单…'
@@ -339,17 +453,9 @@
       const created = await api('api/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': newIdempotencyKey() },
-        body: JSON.stringify({ sku_key: selectedSku.key, quantity, channel_id: selectedChannelId })
+        body: JSON.stringify({ sku_key: selectedSku.key, quantity })
       })
-      let order = created.order
-      if (order.status !== 'credited' && order.status !== 'canceled' && order.status !== 'refunded' && !order.pay_url && !order.qr_code) {
-        const paid = await api(`api/orders/${encodeURIComponent(order.order_no)}/pay`, {
-          method: 'POST',
-          body: JSON.stringify({ channel_id: selectedChannelId })
-        })
-        order = paid.order
-      }
-      showOrder(order)
+      await continueOrder(created.order)
       await loadOrders()
     } catch (error) {
       toast(error.message)
@@ -357,10 +463,12 @@
       busy = false
       ui.submit.textContent = '立即充值'
       updateSubmitState()
+      if (!ui.paymentMethods.classList.contains('hidden')) renderChannels()
     }
   }
 
   function showOrder(order) {
+    hidePaymentMethods()
     activeOrder = order
     ui.payment.classList.remove('hidden')
     renderPayment(order)
@@ -373,24 +481,14 @@
     busy = true
     try {
       const detail = await api(`api/orders/${encodeURIComponent(orderNo)}`)
-      let order = detail.order
-      if (order.status === 'created' || order.status === 'pending_payment') {
-        if (!order.pay_url && !order.qr_code) {
-          const channelId = Number(order.channel_id || selectedChannelId)
-          if (!channelId) throw new Error('支付通道尚未加载，请刷新页面后重试')
-          const paid = await api(`api/orders/${encodeURIComponent(orderNo)}/pay`, {
-            method: 'POST',
-            body: JSON.stringify({ channel_id: channelId })
-          })
-          order = paid.order
-        }
-      }
-      showOrder(order)
+      await continueOrder(detail.order)
       await loadOrders()
     } catch (error) {
       toast(error.message)
     } finally {
       busy = false
+      updateSubmitState()
+      if (!ui.paymentMethods.classList.contains('hidden')) renderChannels()
     }
   }
 
@@ -492,7 +590,7 @@
   ui.orderSearch.addEventListener('input', () => renderOrders(ordersCache))
   ui.orderStatus.addEventListener('change', () => renderOrders(ordersCache))
 
-  Promise.all([loadCatalog(), loadChannels(), loadOrders()]).catch((error) => {
+  Promise.all([loadCatalog(), loadOrders()]).catch((error) => {
     ui.loginError.classList.remove('hidden')
     ui.loginError.querySelector('p').textContent = error.message
     ui.recharge.classList.add('hidden')

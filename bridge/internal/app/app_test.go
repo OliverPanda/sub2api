@@ -69,6 +69,14 @@ func TestStaticPageUsesSameOriginAssets(t *testing.T) {
 			t.Fatalf("index is missing post-payment navigation %q", want)
 		}
 	}
+	for _, want := range []string{`id="payment-methods"`, `id="channels"`, `档位不绑定支付渠道`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("index is missing payment method checkout %q", want)
+		}
+	}
+	if strings.Contains(body, "STEP 2") {
+		t.Fatal("index must not require a payment channel before creating the order")
+	}
 }
 
 func TestSecurityHeadersAndFrameAncestors(t *testing.T) {
@@ -115,10 +123,17 @@ func TestFrontendNeverReadsJWTFromURL(t *testing.T) {
 			t.Fatalf("frontend still uses root-absolute API path %q", unwanted)
 		}
 	}
-	for _, want := range []string{"暂未配置充值套餐", "支付通道维护中", "继续支付", "order-search"} {
+	for _, want := range []string{
+		"暂未配置充值套餐", "支付通道维护中", "继续支付", "order-search",
+		"body: JSON.stringify({ sku_key: selectedSku.key, quantity })",
+		"api/payment-channels?order_no=",
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("frontend is missing recovery state %q", want)
 		}
+	}
+	if strings.Contains(body, "selectedChannelId") {
+		t.Fatal("frontend must not preselect a payment channel with the order")
 	}
 }
 

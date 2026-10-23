@@ -309,9 +309,8 @@ func (a *App) handlePaymentChannels(w http.ResponseWriter, r *http.Request) {
 }
 
 type createOrderRequest struct {
-	SKUKey    string `json:"sku_key"`
-	Quantity  int    `json:"quantity"`
-	ChannelID int64  `json:"channel_id"`
+	SKUKey   string `json:"sku_key"`
+	Quantity int    `json:"quantity"`
 }
 
 func (a *App) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
@@ -364,8 +363,7 @@ func (a *App) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		SKUID: sku.SKUID, Quantity: req.Quantity, Currency: sku.Currency,
 		OrderAmountCents: money.FromInt64(sku.PriceCents.Int64() * int64(req.Quantity)),
 		CreditCents:      money.FromInt64(sku.CreditCents.Int64() * int64(req.Quantity)),
-		Status:           domain.StatusCreated, SelectedChannelID: req.ChannelID,
-		IdempotencyKey: scopedKey, ExpiresAt: &expiresAt,
+		Status:           domain.StatusCreated, IdempotencyKey: scopedKey, ExpiresAt: &expiresAt,
 	}
 	if err := a.store.CreateOrder(r.Context(), order); err != nil {
 		if errors.Is(err, store.ErrDuplicate) {
@@ -395,13 +393,6 @@ func (a *App) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		a.logger.Printf("save Dujiao order %s: %v", order.BridgeOrderNo, err)
 		writeError(w, http.StatusInternalServerError, "STORE_ERROR", "订单保存失败")
 		return
-	}
-	if req.ChannelID > 0 {
-		if err := a.createPayment(r.Context(), order.BridgeOrderNo, remote.ID, user.ID, req.ChannelID); err != nil {
-			a.logger.Printf("create payment for %s: %v", order.BridgeOrderNo, err)
-			writeError(w, http.StatusBadGateway, "PAYMENT_ERROR", "订单已创建，但支付页面生成失败，请重试")
-			return
-		}
 	}
 	updated, err := a.store.GetOrderForUser(r.Context(), order.BridgeOrderNo, user.ID)
 	if err != nil {

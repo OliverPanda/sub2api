@@ -10,7 +10,7 @@ Sub2API 用户登录态
         v
 https://api.xddapi.org.uk/shop/
         |
-        | 创建 Dujiao-Next 订单、选择支付方式
+        | 创建 Dujiao-Next 订单（档位不绑定渠道）
         v
 Dujiao-Next（pay.xddapi.org.uk）
         |
@@ -80,11 +80,12 @@ paid 后退款
 
 1. **服务端价格校验**：SKU 的 `price`、`credit`、`product_id`、`sku_id` 只在服务端配置中读取，浏览器只能提交 SKU key 和数量。
 2. **创建订单后二次校验**：Dujiao 实际订单金额和币种必须与本地 SKU 计算结果完全一致，否则取消 Dujiao 订单并返回 `PRICE_CHANGED`。
-3. **回调验签**：校验 `Dujiao-Next-Channel-Key`、时间戳、HMAC-SHA256 签名和回调路径。
-4. **回调不是到账依据**：验签后仍用 Dujiao Channel API 重新查询订单，核对 Dujiao 订单 ID、币种、订单金额和实付金额。
-5. **幂等入账**：Bridge 订单号生成固定充值码 `xddshop-<bridge-order-no>`，同时传入 `Idempotency-Key: redeem-<bridge-order-no>`。重复回调不会重复加余额。
-6. **先记支付，后入账**：Sub2API Admin Key 未配置或暂时调用失败时，Dujiao 已支付订单会保留为 `credit_failed`，不会因为 Bridge 重启而丢失。
-7. **不信任客户端金额**：客户端不传余额数量，Bridge 按 `sku.credit × quantity` 计算到账金额。
+3. **档位与支付渠道解耦**：创建 Bridge/Dujiao 订单时不提交 `channel_id`。订单创建完成后，再按该订单查询所有允许的支付渠道；只有一个渠道时自动进入支付，多个渠道时才展示具体付款方式。
+4. **回调验签**：校验 `Dujiao-Next-Channel-Key`、时间戳、HMAC-SHA256 签名和回调路径。
+5. **回调不是到账依据**：验签后仍用 Dujiao Channel API 重新查询订单，核对 Dujiao 订单 ID、币种、订单金额和实付金额。
+6. **幂等入账**：Bridge 订单号生成固定充值码 `xddshop-<bridge-order-no>`，同时传入 `Idempotency-Key: redeem-<bridge-order-no>`。重复回调不会重复加余额。
+7. **先记支付，后入账**：Sub2API Admin Key 未配置或暂时调用失败时，Dujiao 已支付订单会保留为 `credit_failed`，不会因为 Bridge 重启而丢失。
+8. **不信任客户端金额**：客户端不传余额数量，Bridge 按 `sku.credit × quantity` 计算到账金额。
 
 > 不要同时启用 Sub2API 原生充值和本 Bridge，否则同一用户可能看到两套充值入口、两套订单和两套对账口径。确定使用 Bridge 后，以 `/shop/` 为唯一充值入口。
 
@@ -182,6 +183,13 @@ GET /api/payment-channels?order_no=xdd-20261023T120000-abcd1234
 ```
 
 Bridge 会先校验该订单属于当前登录用户，再让 Dujiao 按订单商品过滤支付通道，避免展示商品不允许的支付方式。
+
+档位目录本身不保存支付渠道。用户确认档位和数量后，Bridge 才创建订单并调用上述接口获取该订单可用渠道：
+
+- 单渠道：自动创建支付单，用户无需再次选择。
+- 多渠道：展示 Dujiao 返回的全部可用付款方式，用户只选择付款方式，不发生档位与渠道绑定。
+
+Dujiao Channel API 当前没有“不指定渠道的统一收银台支付单”接口，因此多渠道场景不能诚实地做成零选择。若后续接入支持聚合收银台的单一 Provider，可再移除这一步付款方式选择。
 
 ## 6. Sub2API Admin API Key
 
