@@ -76,8 +76,9 @@ jobs:
             -v "$tmp/certs:/etc/caddy/certs:ro" \
             caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile
 
-  test:
+  test_unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - name: Check Docker Compose simple mode environment
@@ -94,9 +95,41 @@ jobs:
       - name: Unit tests
         working-directory: backend
         run: make test-unit
+
+  test_integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: |
+          go version | grep -q 'go1.27.2'
       - name: Integration tests
         working-directory: backend
         run: make test-integration
+
+  # Keep the stable "test" check name for branch protection while running the
+  # expensive suites concurrently above.
+  test:
+    if: always()
+    needs: [test_unit, test_integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify test suites passed
+        env:
+          UNIT_RESULT: ${{ needs.test_unit.result }}
+          INTEGRATION_RESULT: ${{ needs.test_integration.result }}
+        run: |
+          printf 'unit=%s\nintegration=%s\n' "$UNIT_RESULT" "$INTEGRATION_RESULT"
+          [[ "$UNIT_RESULT" == "success" ]]
+          [[ "$INTEGRATION_RESULT" == "success" ]]
 
   bridge:
     runs-on: ubuntu-latest
