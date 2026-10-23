@@ -103,11 +103,20 @@ func New(baseURL, channelKey, secret string, client *http.Client) *Client {
 	}
 }
 
-func (c *Client) PaymentChannels(ctx context.Context) ([]PaymentChannel, error) {
+// PaymentChannels lists active channels. When orderNo is provided, Dujiao
+// filters the result to channels allowed by that order's products.
+func (c *Client) PaymentChannels(ctx context.Context, orderNo, channelUserID string) ([]PaymentChannel, error) {
 	var data struct {
 		Items []PaymentChannel `json:"items"`
 	}
-	if err := c.do(ctx, http.MethodGet, "/api/v1/channel/payment-channels", nil, nil, &data); err != nil {
+	query := url.Values{}
+	if value := strings.TrimSpace(orderNo); value != "" {
+		query.Set("order_no", value)
+	}
+	if value := strings.TrimSpace(channelUserID); value != "" {
+		query.Set("channel_user_id", value)
+	}
+	if err := c.do(ctx, http.MethodGet, "/api/v1/channel/payment-channels", query, nil, &data); err != nil {
 		return nil, err
 	}
 	return data.Items, nil

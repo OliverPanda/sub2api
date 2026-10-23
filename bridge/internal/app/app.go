@@ -263,7 +263,8 @@ func (a *App) handleCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handlePaymentChannels(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.authenticate(r); err != nil {
+	user, err := a.authenticate(r)
+	if err != nil {
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录已失效，请重新登录")
 		return
 	}
@@ -273,7 +274,22 @@ func (a *App) handlePaymentChannels(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	channels, err := a.dujiao.PaymentChannels(r.Context())
+	orderNo := strings.TrimSpace(r.URL.Query().Get("order_no"))
+	channelUserID := ""
+	if orderNo != "" {
+		order, orderErr := a.store.GetOrderForUser(r.Context(), orderNo, user.ID)
+		if orderErr != nil {
+			writeError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "订单不存在")
+			return
+		}
+		if strings.TrimSpace(order.DujiaoOrderNo) == "" {
+			writeError(w, http.StatusConflict, "ORDER_NOT_READY", "订单尚未创建完成，请稍后重试")
+			return
+		}
+		orderNo = order.DujiaoOrderNo
+		channelUserID = channelUserIDFor(user.ID)
+	}
+	channels, err := a.dujiao.PaymentChannels(r.Context(), orderNo, channelUserID)
 	if err != nil {
 		a.logger.Printf("list payment channels: %v", err)
 		writeError(w, http.StatusBadGateway, "PAYMENT_CHANNELS_UNAVAILABLE", "支付方式暂时不可用")

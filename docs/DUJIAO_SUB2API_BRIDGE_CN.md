@@ -175,6 +175,14 @@ GET /api/v1/channel/payment-channels
 
 `payment_configured` 为 `true` 只表示 Bridge 已拿到 Channel Key/Secret，不表示支付通道已审核通过；支付方式是否可用以 Dujiao 后台和 `/api/payment-channels` 返回结果为准。
 
+如果商品只在部分支付通道上架，可在查询时传入 Bridge 订单号：
+
+```text
+GET /api/payment-channels?order_no=xdd-20261023T120000-abcd1234
+```
+
+Bridge 会先校验该订单属于当前登录用户，再让 Dujiao 按订单商品过滤支付通道，避免展示商品不允许的支付方式。
+
 ## 6. Sub2API Admin API Key
 
 Bridge 入账调用：

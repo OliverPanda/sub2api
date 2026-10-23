@@ -96,6 +96,32 @@ func TestCreateOrderDecodesOrderID(t *testing.T) {
 	}
 }
 
+func TestPaymentChannelsFiltersByOrder(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/channel/payment-channels" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.URL.Query().Get("order_no"); got != "ORD-123" {
+			t.Fatalf("order_no = %q", got)
+		}
+		if got := r.URL.Query().Get("channel_user_id"); got != "sub2api-user-7" {
+			t.Fatalf("channel_user_id = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status_code":0,"msg":"ok","data":{"items":[{"id":3,"name":"微信支付","provider_type":"wechatpay","channel_type":"wechatpay","interaction_mode":"qr"}]}}`))
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "key", "secret", server.Client())
+	channels, err := client.PaymentChannels(context.Background(), "ORD-123", "sub2api-user-7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(channels) != 1 || channels[0].ID != 3 {
+		t.Fatalf("unexpected channels: %+v", channels)
+	}
+}
+
 func TestGetOrderSendsChannelUserIDAndSignsPathOnly(t *testing.T) {
 	const timestamp = "1700000000"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
