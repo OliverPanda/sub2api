@@ -588,7 +588,8 @@ docs/PAYMENT_HK_CN.md
 ```bash
 cd /opt/sub2api
 OLD_COMPOSE=backups/pre-bridge-20261023T040659Z/compose.yml
-docker compose -p sub2api -f "$OLD_COMPOSE" --env-file .env \
+docker compose --project-directory /opt/sub2api \
+  -p sub2api -f "$OLD_COMPOSE" --env-file .env \
   --env-file state/release.env down
 
 docker ps --format '{{.Names}}' | grep -E '^sub2api-' && exit 1 || true
