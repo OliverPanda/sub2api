@@ -441,7 +441,7 @@ func (a *App) createPayment(ctx context.Context, orderNo string, dujiaoOrderID, 
 	if err != nil {
 		return err
 	}
-	return a.store.SetPayment(ctx, orderNo, payment.ID, payment.PayURL, payment.QRCode)
+	return a.store.SetPayment(ctx, orderNo, payment.ID, channelID, payment.PayURL, payment.QRCode)
 }
 
 func (a *App) handleGetOrder(w http.ResponseWriter, r *http.Request) {
@@ -707,7 +707,9 @@ func orderView(order *domain.Order) map[string]any {
 		"quantity": order.Quantity, "currency": order.Currency,
 		"order_amount": order.OrderAmountCents.String(), "credit_amount": order.CreditCents.String(),
 		"pay_url": order.PaymentURL, "qr_code": order.QRCode,
-		"created_at": order.CreatedAt, "expires_at": order.ExpiresAt,
+		"channel_id": order.SelectedChannelID, "created_at": order.CreatedAt,
+		"updated_at": order.UpdatedAt, "expires_at": order.ExpiresAt,
+		"paid_at": order.PaidAt, "credited_at": order.CreditedAt,
 	}
 	if order.Status == domain.StatusCreditFailed {
 		result["message"] = "支付已确认，但余额到账暂时失败。系统会自动重试。"

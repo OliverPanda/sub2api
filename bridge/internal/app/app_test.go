@@ -13,6 +13,7 @@ import (
 	"github.com/OliverPanda/sub2api/bridge/internal/config"
 	"github.com/OliverPanda/sub2api/bridge/internal/domain"
 	"github.com/OliverPanda/sub2api/bridge/internal/dujiao"
+	"github.com/OliverPanda/sub2api/bridge/internal/money"
 	"github.com/OliverPanda/sub2api/bridge/internal/sub2api"
 )
 
@@ -114,7 +115,7 @@ func TestFrontendNeverReadsJWTFromURL(t *testing.T) {
 			t.Fatalf("frontend still uses root-absolute API path %q", unwanted)
 		}
 	}
-	for _, want := range []string{"暂未配置充值套餐", "支付通道维护中"} {
+	for _, want := range []string{"暂未配置充值套餐", "支付通道维护中", "继续支付", "order-search"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("frontend is missing recovery state %q", want)
 		}
@@ -192,5 +193,25 @@ func TestPaymentChannelsEmptyIsSuccessful(t *testing.T) {
 	app.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"channels":[]`) {
 		t.Fatalf("empty channels response = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestOrderViewIncludesPaymentContinuationFields(t *testing.T) {
+	paidAt := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
+	creditedAt := paidAt.Add(5 * time.Second)
+	view := orderView(&domain.Order{
+		BridgeOrderNo: "xdd-test", Status: domain.StatusCredited,
+		SKUKey: "starter", Quantity: 1, Currency: "CNY",
+		OrderAmountCents: money.FromInt64(1000), CreditCents: money.FromInt64(1200),
+		SelectedChannelID: 42, PaidAt: &paidAt, CreditedAt: &creditedAt,
+	})
+	if got := view["channel_id"]; got != int64(42) {
+		t.Fatalf("channel_id = %#v, want 42", got)
+	}
+	if got, ok := view["paid_at"].(*time.Time); !ok || got == nil || !got.Equal(paidAt) {
+		t.Fatalf("paid_at = %#v, want %v", view["paid_at"], paidAt)
+	}
+	if got, ok := view["credited_at"].(*time.Time); !ok || got == nil || !got.Equal(creditedAt) {
+		t.Fatalf("credited_at = %#v, want %v", view["credited_at"], creditedAt)
 	}
 }

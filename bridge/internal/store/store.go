@@ -279,11 +279,12 @@ WHERE bridge_order_no = $1`, orderNo, orderID, dujiaoOrderNo, currency, amount.I
 	return nil
 }
 
-func (s *Store) SetPayment(ctx context.Context, orderNo string, paymentID int64, payURL, qrCode string) error {
+func (s *Store) SetPayment(ctx context.Context, orderNo string, paymentID, channelID int64, payURL, qrCode string) error {
 	_, err := s.db.ExecContext(ctx, `
 UPDATE bridge_orders
-SET dujiao_payment_id = $2, payment_url = $3, qr_code = $4, updated_at = NOW(), next_attempt_at = NOW()
-WHERE bridge_order_no = $1`, orderNo, paymentID, payURL, qrCode)
+SET dujiao_payment_id = $2, selected_channel_id = $3, payment_url = $4, qr_code = $5,
+    updated_at = NOW(), next_attempt_at = NOW()
+WHERE bridge_order_no = $1`, orderNo, paymentID, channelID, payURL, qrCode)
 	if err != nil {
 		return fmt.Errorf("save dujiao payment: %w", err)
 	}

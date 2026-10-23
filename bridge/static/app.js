@@ -10,6 +10,8 @@
   let selectedSku = null
   let selectedChannelId = 0
   let activeOrder = null
+  let ordersCache = []
+  const expandedOrders = new Set()
   let supportUrl = ''
   let supportLabel = '联系客服'
   let pollTimer = null
@@ -24,7 +26,8 @@
     payLink: $('pay-link'), paymentMeta: $('payment-meta'), qrWrap: $('qr-wrap'), qrImage: $('qr-image'),
     refreshPayment: $('refresh-payment'), consoleLink: $('console-link'), supportLink: $('support-link'),
     footerSupport: $('footer-support'), footerSupportHint: $('footer-support-hint'),
-    orders: $('orders'), reloadOrders: $('reload-orders'),
+    orders: $('orders'), ordersSummary: $('orders-summary'), orderSearch: $('order-search'),
+    orderStatus: $('order-status'), reloadOrders: $('reload-orders'),
     toast: $('toast')
   }
 
@@ -218,21 +221,71 @@
   }
 
   function renderOrders(orders) {
-    if (!orders || !orders.length) {
-      ui.orders.innerHTML = '<span class="muted">还没有充值记录。</span>'
+    ordersCache = Array.isArray(orders) ? orders : []
+    const query = String(ui.orderSearch.value || '').trim().toLowerCase()
+    const filter = ui.orderStatus.value
+    const filtered = ordersCache.filter((order) => {
+      if (query && !String(order.order_no || '').toLowerCase().includes(query)) return false
+      return statusMatchesFilter(order.status, filter)
+    })
+    if (!filtered.length) {
+      ui.ordersSummary.textContent = ordersCache.length ? `共 ${ordersCache.length} 条，当前筛选无结果` : ''
+      ui.orders.innerHTML = ordersCache.length
+        ? '<span class="muted">没有符合筛选条件的充值记录，请调整搜索或状态。</span>'
+        : '<span class="muted">还没有充值记录。</span>'
       return
     }
-    ui.orders.innerHTML = orders.map((order) => {
+    ui.ordersSummary.textContent = `显示 ${filtered.length} / ${ordersCache.length} 条，最近 30 条充值记录`
+    ui.orders.innerHTML = filtered.map((order) => {
       const [label, kind] = statusMeta(order.status)
-      return `<div class="order-row">
-        <div>
-          <div class="order-id">${escapeHTML(order.order_no)}</div>
-          <div class="order-date">${escapeHTML(new Date(order.created_at).toLocaleString('zh-CN'))}</div>
+      const action = orderAction(order.status)
+      return `<article class="order-item">
+        <div class="order-row">
+          <div class="order-main">
+            <div class="order-id">${escapeHTML(order.order_no)}</div>
+            <div class="order-date">${escapeHTML(new Date(order.created_at).toLocaleString('zh-CN'))}</div>
+          </div>
+          <div class="order-amount">${escapeHTML(moneyLabel(order.order_amount, order.currency))}</div>
+          <span class="pill ${kind}">${escapeHTML(label)}</span>
+          <button class="text-button order-action" type="button" data-order-action="${escapeHTML(order.order_no)}">${escapeHTML(action)}</button>
         </div>
-        <div class="order-amount">${escapeHTML(moneyLabel(order.order_amount, order.currency))}</div>
-        <span class="pill ${kind}">${escapeHTML(label)}</span>
-      </div>`
+        <details class="order-detail"${expandedOrders.has(order.order_no) ? ' open' : ''} data-order-detail="${escapeHTML(order.order_no)}">
+          <summary>订单详情</summary>
+          <dl>
+            <div><dt>套餐</dt><dd>${escapeHTML(order.sku_key)}</dd></div>
+            <div><dt>数量</dt><dd>${escapeHTML(order.quantity)}</dd></div>
+            <div><dt>到账额度</dt><dd>${escapeHTML(creditLabel(order.credit_amount))}</dd></div>
+            <div><dt>创建时间</dt><dd>${escapeHTML(new Date(order.created_at).toLocaleString('zh-CN'))}</dd></div>
+            ${order.paid_at ? `<div><dt>支付确认</dt><dd>${escapeHTML(new Date(order.paid_at).toLocaleString('zh-CN'))}</dd></div>` : ''}
+            ${order.credited_at ? `<div><dt>到账时间</dt><dd>${escapeHTML(new Date(order.credited_at).toLocaleString('zh-CN'))}</dd></div>` : ''}
+          </dl>
+        </details>
+      </article>`
     }).join('')
+    ui.orders.querySelectorAll('[data-order-action]').forEach((button) => {
+      button.addEventListener('click', () => resumeOrder(button.dataset.orderAction))
+    })
+    ui.orders.querySelectorAll('[data-order-detail]').forEach((details) => {
+      details.addEventListener('toggle', () => {
+        if (details.open) expandedOrders.add(details.dataset.orderDetail)
+        else expandedOrders.delete(details.dataset.orderDetail)
+      })
+    })
+  }
+
+  function statusMatchesFilter(status, filter) {
+    if (filter === 'all') return true
+    if (filter === 'unpaid') return status === 'created' || status === 'pending_payment'
+    if (filter === 'processing') return status === 'paid' || status === 'crediting' || status === 'credit_failed'
+    if (filter === 'credited') return status === 'credited'
+    if (filter === 'closed') return status === 'canceled' || status === 'refunded'
+    return true
+  }
+
+  function orderAction(status) {
+    if (status === 'created' || status === 'pending_payment') return '继续支付'
+    if (status === 'paid' || status === 'crediting' || status === 'credit_failed') return '查看状态'
+    return '查看详情'
   }
 
   async function loadCatalog() {
@@ -315,13 +368,40 @@
     schedulePoll()
   }
 
+  async function resumeOrder(orderNo) {
+    if (busy || !orderNo) return
+    busy = true
+    try {
+      const detail = await api(`api/orders/${encodeURIComponent(orderNo)}`)
+      let order = detail.order
+      if (order.status === 'created' || order.status === 'pending_payment') {
+        if (!order.pay_url && !order.qr_code) {
+          const channelId = Number(order.channel_id || selectedChannelId)
+          if (!channelId) throw new Error('支付通道尚未加载，请刷新页面后重试')
+          const paid = await api(`api/orders/${encodeURIComponent(orderNo)}/pay`, {
+            method: 'POST',
+            body: JSON.stringify({ channel_id: channelId })
+          })
+          order = paid.order
+        }
+      }
+      showOrder(order)
+      await loadOrders()
+    } catch (error) {
+      toast(error.message)
+    } finally {
+      busy = false
+    }
+  }
+
   function renderPayment(order) {
     const [label, kind] = statusMeta(order.status)
     ui.paymentStatus.textContent = label
     ui.paymentStatus.className = `status ${kind}`
 
+    const payable = order.status === 'created' || order.status === 'pending_payment'
     const qr = String(order.qr_code || '')
-    if (qr && (/^data:image\//.test(qr) || /^https?:\/\//.test(qr))) {
+    if (payable && qr && (/^data:image\//.test(qr) || /^https?:\/\//.test(qr))) {
       ui.qrImage.src = qr
       ui.qrWrap.classList.remove('hidden')
     } else {
@@ -329,7 +409,7 @@
       ui.qrWrap.classList.add('hidden')
     }
 
-    if (order.pay_url) {
+    if (payable && /^https?:\/\//.test(String(order.pay_url || ''))) {
       ui.payLink.href = order.pay_url
       ui.payLink.classList.remove('hidden')
     } else {
@@ -409,6 +489,8 @@
   ui.submit.addEventListener('click', createPayment)
   ui.refreshPayment.addEventListener('click', refreshPayment)
   ui.reloadOrders.addEventListener('click', loadOrders)
+  ui.orderSearch.addEventListener('input', () => renderOrders(ordersCache))
+  ui.orderStatus.addEventListener('change', () => renderOrders(ordersCache))
 
   Promise.all([loadCatalog(), loadChannels(), loadOrders()]).catch((error) => {
     ui.loginError.classList.remove('hidden')
