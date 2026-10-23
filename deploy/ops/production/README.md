@@ -568,6 +568,50 @@ docs/PAYMENT_HK_CN.md
 
 数据库迁移是 forward-only。自动回滚不会恢复 PostgreSQL、Bridge 订单或 Dujiao 支付数据。数据库不兼容时必须人工处理。
 
+### 9.2 从旧单镜像栈首次迁移
+
+旧栈的 Compose project 名是 `sub2api`，新栈是 `xdd-api`，而且两者共用
+`postgres_data`、`redis_data` 和 `data` bind mount。首次迁移必须先把旧栈
+完整停止，不能让两套 PostgreSQL 或两个 Caddy 同时运行。
+
+迁移前确认：
+
+```text
+[ ] /opt/sub2api/backups 下有 Sub2API 数据库备份
+[ ] caddy/origin.pem 的 SAN 同时覆盖 api.xddapi.org.uk 和 pay.xddapi.org.uk
+[ ] /opt/sub2api/.env 已写入 Bridge、Dujiao 和 Sub2API Admin Key 配置
+[ ] 已安排短暂维护窗口
+```
+
+使用安装前的备份 Compose 停止旧 project，但不要删除 bind mount：
+
+```bash
+cd /opt/sub2api
+OLD_COMPOSE=backups/pre-bridge-20261023T040659Z/compose.yml
+docker compose -p sub2api -f "$OLD_COMPOSE" --env-file .env \
+  --env-file state/release.env down
+
+docker ps --format '{{.Names}}' | grep -E '^sub2api-' && exit 1 || true
+```
+
+然后触发新版生产 workflow。脚本会创建 `xdd-api-*` 服务和 bridge/Dujiao
+数据库，复用原有 Sub2API、Redis 和 `data` bind mount。首次双镜像发布完成
+后，`state/release.env` 才会同时包含 `SUB2API_IMAGE` 和 `BRIDGE_IMAGE`；
+在此之前不要让旧单镜像栈和新栈同时启动。
+
+迁移后必须验证：
+
+```bash
+curl -fsS https://api.xddapi.org.uk/health
+curl -fsS https://api.xddapi.org.uk/shop/healthz
+curl -fsS https://pay.xddapi.org.uk/health
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+```
+
+如果首次迁移失败，不要再运行新版 `rollback` 命令（旧元数据没有 Bridge
+digest）。保留备份和日志，使用旧 Compose 和应用镜像按人工流程恢复，或者
+修复问题后重新触发首次双镜像发布。
+
 ## 14. 日常运维命令
 
 ```bash
