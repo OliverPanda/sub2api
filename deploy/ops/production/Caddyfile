@@ -33,7 +33,7 @@
 	# The bridge is mounted under a stable same-origin prefix so it can read
 	# Sub2API's auth token from localStorage without putting a JWT in a URL.
 	handle /shop {
-		redir /shop/ 308
+		redir * /shop/ 308
 	}
 	handle /shop/* {
 		uri strip_prefix /shop

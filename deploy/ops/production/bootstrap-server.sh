@@ -176,7 +176,9 @@ if [[ -z "$admin_password" ]]; then
 fi
 dujiao_admin_password=$(env_get DUJIAO_ADMIN_PASSWORD)
 if [[ -z "$dujiao_admin_password" ]]; then
-  dujiao_admin_password=$(openssl rand -hex 24)
+  # Dujiao requires upper, lower, and numeric characters by default. A raw
+  # hex secret is lower-case only and makes the service crash-loop at boot.
+  dujiao_admin_password="Xdd1$(openssl rand -hex 23)Aa"
   set_env DUJIAO_ADMIN_PASSWORD "$dujiao_admin_password"
   log "Generated DUJIAO_ADMIN_PASSWORD"
 fi

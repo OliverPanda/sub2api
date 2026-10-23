@@ -115,10 +115,33 @@ ensure_dependencies() {
   wait_service_healthy dujiao-postgres 180
   wait_service_healthy dujiao-redis 120
 
-  # Dujiao is deliberately not recreated or upgraded by application releases.
-  # It is started here only when the service is completely absent.
-  start_if_missing dujiao-next
+  # Dujiao is deliberately not upgraded by application releases. An existing
+  # unhealthy container is recreated with the same pinned image so corrected
+  # runtime configuration (for example, an invalid bootstrap password) can
+  # take effect without requiring a manual SSH repair.
+  local dujiao_id dujiao_status
+  dujiao_id=$(compose ps -q dujiao-next 2>/dev/null || true)
+  if [[ -z "$dujiao_id" ]]; then
+    start_if_missing dujiao-next
+  else
+    dujiao_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$dujiao_id" 2>/dev/null || echo missing)
+    if [[ "$dujiao_status" != "healthy" ]]; then
+      log WARN "Recreating unhealthy dependency dujiao-next with its pinned image"
+      compose up -d --no-deps --force-recreate dujiao-next
+    fi
+  fi
   wait_service_healthy dujiao-next 240
+}
+
+running_release_value() {
+  local service=$1 format=$2 container_id
+  container_id=$(compose ps -q "$service" 2>/dev/null || true)
+  [[ -n "$container_id" ]] || return 0
+  docker inspect --format "$format" "$container_id" 2>/dev/null || true
+}
+
+digest_from_image() {
+  sed -n 's/.*@\(sha256:[0-9a-f]\{64\}\)$/\1/p'
 }
 
 capture_previous_release() {
@@ -151,10 +174,39 @@ capture_previous_release() {
   fi
 
   if [[ -n "$PREVIOUS_SUB2API_IMAGE" ]]; then
-    PREVIOUS_RELEASE_FILE="${SUB2API_ROOT}/state/release.env.previous"
-    write_release_env_file "$PREVIOUS_RELEASE_FILE" \
-      "$PREVIOUS_SUB2API_IMAGE" "$PREVIOUS_BRIDGE_IMAGE" "$PREVIOUS_VERSION" \
-      "$PREVIOUS_SUB2API_DIGEST" "$PREVIOUS_BRIDGE_DIGEST" "$PREVIOUS_REVISION"
+    # Recover missing fields from the containers that are actually serving
+    # traffic. This keeps automatic rollback usable when an older state file
+    # was written before dual-image metadata was introduced.
+    if [[ -z "$PREVIOUS_BRIDGE_IMAGE" ]]; then
+      PREVIOUS_BRIDGE_IMAGE=$(running_release_value bridge '{{.Config.Image}}')
+    fi
+    if [[ -z "$PREVIOUS_VERSION" ]]; then
+      PREVIOUS_VERSION=$(running_release_value sub2api '{{index .Config.Labels "org.opencontainers.image.version"}}')
+      if [[ -n "$PREVIOUS_VERSION" && "$PREVIOUS_VERSION" != v* ]]; then
+        PREVIOUS_VERSION="v${PREVIOUS_VERSION}"
+      fi
+    fi
+    if [[ -z "$PREVIOUS_SUB2API_DIGEST" ]]; then
+      PREVIOUS_SUB2API_DIGEST=$(printf '%s\n' "$PREVIOUS_SUB2API_IMAGE" | digest_from_image)
+    fi
+    if [[ -z "$PREVIOUS_BRIDGE_DIGEST" ]]; then
+      PREVIOUS_BRIDGE_DIGEST=$(printf '%s\n' "$PREVIOUS_BRIDGE_IMAGE" | digest_from_image)
+    fi
+    if [[ -z "$PREVIOUS_REVISION" ]]; then
+      PREVIOUS_REVISION=$(running_release_value sub2api '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+    fi
+
+    if [[ -z "$PREVIOUS_BRIDGE_IMAGE" || -z "$PREVIOUS_VERSION" ]] \
+      || ! validate_digest "$PREVIOUS_SUB2API_DIGEST" \
+      || ! validate_digest "$PREVIOUS_BRIDGE_DIGEST" \
+      || ! validate_revision "$PREVIOUS_REVISION"; then
+      log WARN "Previous release metadata is incomplete; automatic rollback is unavailable for this deployment"
+    else
+      PREVIOUS_RELEASE_FILE="${SUB2API_ROOT}/state/release.env.previous"
+      write_release_env_file "$PREVIOUS_RELEASE_FILE" \
+        "$PREVIOUS_SUB2API_IMAGE" "$PREVIOUS_BRIDGE_IMAGE" "$PREVIOUS_VERSION" \
+        "$PREVIOUS_SUB2API_DIGEST" "$PREVIOUS_BRIDGE_DIGEST" "$PREVIOUS_REVISION"
+    fi
   fi
   log INFO "Previous release: ${PREVIOUS_VERSION:-none} sub2api=${PREVIOUS_SUB2API_DIGEST:-no-digest} bridge=${PREVIOUS_BRIDGE_DIGEST:-no-digest}"
 }
@@ -263,7 +315,7 @@ rollback_to_previous() {
     log ERROR "Previous application images did not become healthy"
     return 1
   fi
-  if ! compose up -d --no-deps caddy; then
+  if ! compose up -d --no-deps --force-recreate caddy; then
     log ERROR "Could not restart Caddy after application rollback"
     return 1
   fi
@@ -368,7 +420,7 @@ compose up -d --no-deps --force-recreate sub2api bridge
 "$SCRIPT_DIR/wait-health.sh"
 
 log INFO "Ensuring Caddy is running"
-compose up -d --no-deps caddy
+compose up -d --no-deps --force-recreate caddy
 wait_service_healthy caddy 120
 
 "$SCRIPT_DIR/smoke-test.sh"
