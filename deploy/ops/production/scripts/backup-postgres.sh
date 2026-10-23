@@ -26,7 +26,10 @@ cleanup() {
 trap cleanup EXIT
 
 backup_database() {
-  local service=$1 name=$2 tmp="${bundle}/${name}.dump.tmp" final="${bundle}/${name}.dump"
+  local service=$1
+  local name=$2
+  local tmp="${bundle}/${name}.dump.tmp"
+  local final="${bundle}/${name}.dump"
 
   if [[ -z "$(compose ps -q "$service" 2>/dev/null || true)" ]]; then
     die "${service} is not running; refusing to continue without a complete backup"
