@@ -47,6 +47,7 @@ compose() {
     # A command-local assignment avoids leaking the placeholder into a later
     # compose call in the same deployment process.
     SUB2API_IMAGE="${SUB2API_IMAGE:-ghcr.io/oliverpanda/sub2api:not-deployed}" \
+      BRIDGE_IMAGE="${BRIDGE_IMAGE:-ghcr.io/oliverpanda/sub2api-bridge:not-deployed}" \
       docker compose "${args[@]}" "$@"
   fi
 }

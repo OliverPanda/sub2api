@@ -89,26 +89,33 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve immutable image digest
+      - name: Resolve immutable image digests
         if: steps.gate.outputs.deploy == 'true'
-        id: image
+        id: images
         env:
           RELEASE_TAG: ${{ steps.gate.outputs.tag }}
         run: |
           set -euo pipefail
           owner=${GITHUB_REPOSITORY%%/*}
           version="${RELEASE_TAG#v}"
-          image="ghcr.io/${owner,,}/sub2api:${version}"
-          manifest="$RUNNER_TEMP/image-manifest.json"
-          docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' > "$manifest"
-          digest=$(jq -r '.digest // empty' "$manifest")
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            cat "$manifest" >&2
-            echo "Could not resolve a valid image digest for ${image}" >&2
-            exit 1
-          fi
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "::notice title=Production image::${image}@${digest}"
+          resolve_digest() {
+            local image=$1 manifest digest
+            manifest="$RUNNER_TEMP/${image##*/}-manifest.json"
+            docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' > "$manifest"
+            digest=$(jq -r '.digest // empty' "$manifest")
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              cat "$manifest" >&2
+              echo "Could not resolve a valid image digest for ${image}" >&2
+              exit 1
+            fi
+            printf '%s' "$digest"
+          }
+          sub2api_digest=$(resolve_digest "ghcr.io/${owner,,}/sub2api:${version}")
+          bridge_digest=$(resolve_digest "ghcr.io/${owner,,}/sub2api-bridge:${version}")
+          echo "sub2api_digest=$sub2api_digest" >> "$GITHUB_OUTPUT"
+          echo "bridge_digest=$bridge_digest" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Production Sub2API image::ghcr.io/${owner,,}/sub2api@${sub2api_digest}"
+          echo "::notice title=Production Bridge image::ghcr.io/${owner,,}/sub2api-bridge@${bridge_digest}"
 
       - name: Ensure Cloudflare DNS and TLS mode
         if: steps.gate.outputs.deploy == 'true'
@@ -117,7 +124,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_DNS_REQUIRED: "true"
           CLOUDFLARE_CONFIGURE_ZONE: "true"
-          CLOUDFLARE_DNS_RECORD_NAME: ${{ vars.CLOUDFLARE_DNS_RECORD_NAME || 'api.xddapi.org.uk' }}
+          CLOUDFLARE_DNS_RECORD_NAMES: ${{ vars.CLOUDFLARE_DNS_RECORD_NAMES || 'api.xddapi.org.uk pay.xddapi.org.uk' }}
           ORIGIN_IPV4: ${{ vars.ORIGIN_IPV4 || '149.104.31.126' }}
           ORIGIN_IPV6: ${{ vars.ORIGIN_IPV6 || '2001:df1:7880:2::3a7' }}
         run: bash deploy/ops/production/scripts/sync-cloudflare-dns.sh
@@ -140,10 +147,11 @@ jobs:
           PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT || '22' }}
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          SUB2API_DIGEST: ${{ steps.images.outputs.sub2api_digest }}
+          BRIDGE_DIGEST: ${{ steps.images.outputs.bridge_digest }}
         run: |
           set -euo pipefail
-          for name in PROD_SSH_HOST PROD_SSH_USER PROD_SSH_PORT PROD_SSH_KEY PROD_SSH_KNOWN_HOSTS IMAGE_DIGEST; do
+          for name in PROD_SSH_HOST PROD_SSH_USER PROD_SSH_PORT PROD_SSH_KEY PROD_SSH_KNOWN_HOSTS SUB2API_DIGEST BRIDGE_DIGEST; do
             if [[ -z "${!name:-}" ]]; then
               echo "Missing required configuration: ${name}" >&2
               exit 1
@@ -176,7 +184,7 @@ jobs:
             -o ServerAliveCountMax=20 \
             -o LogLevel=ERROR \
             "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
-            "deploy ${RELEASE_TAG} ${IMAGE_DIGEST} ${RELEASE_SHA}"
+            "deploy ${RELEASE_TAG} ${SUB2API_DIGEST} ${BRIDGE_DIGEST} ${RELEASE_SHA}"
 
       - name: Notify Telegram
         if: always()
@@ -187,7 +195,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           JOB_STATUS: ${{ job.status }}
           DEPLOY_TRIGGERED: ${{ steps.gate.outputs.deploy }}
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: "sub2api=${{ steps.images.outputs.sub2api_digest }} bridge=${{ steps.images.outputs.bridge_digest }}"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           status=${JOB_STATUS:-failure}
@@ -203,13 +211,15 @@ jobs:
           RELEASE_TAG: ${{ steps.gate.outputs.tag }}
           JOB_STATUS: ${{ job.status }}
           DEPLOY_TRIGGERED: ${{ steps.gate.outputs.deploy }}
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          SUB2API_DIGEST: ${{ steps.images.outputs.sub2api_digest }}
+          BRIDGE_DIGEST: ${{ steps.images.outputs.bridge_digest }}
         run: |
           {
-            echo "## Sub2API production deployment"
+            echo "## XDD API production deployment"
             echo
             echo "- Release: \`${RELEASE_TAG:-unknown}\`"
-            echo "- Digest: \`${IMAGE_DIGEST:-unknown}\`"
+            echo "- Sub2API digest: \`${SUB2API_DIGEST:-unknown}\`"
+            echo "- Bridge digest: \`${BRIDGE_DIGEST:-unknown}\`"
             echo "- Triggered: \`${DEPLOY_TRIGGERED:-false}\`"
             echo "- Result: \`${JOB_STATUS:-unknown}\`"
           } >> "$GITHUB_STEP_SUMMARY"

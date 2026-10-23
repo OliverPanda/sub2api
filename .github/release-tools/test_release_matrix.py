@@ -151,13 +151,18 @@ class ReleaseMatrixTest(unittest.TestCase):
                'DRY_RUN': 'true', 'SIMPLE_RELEASE': 'false', 'DOCKERHUB_USERNAME': 'skip'}
         subprocess.run(['bash', str(ROOT / '.github/release-tools/release-images.sh')], env=env, check=True)
         log = Path('docker.log').read_text()
-        self.assertEqual(log.count('buildx build'), 2)
+        self.assertEqual(log.count('buildx build'), 4)
         self.assertIn('linux/arm64', log)
         self.assertNotIn('--push', log)
         self.assertNotIn('imagetools', log)
         self.assertNotIn('skip/sub2api', log)
         self.assertIn('ghcr.io/exampleowner/sub2api', log)
-
+        self.assertIn('ghcr.io/exampleowner/sub2api-bridge', log)
+        self.assertIn('--file bridge/Dockerfile', log)
+        self.assertIn('--build-arg VERSION=9.8.7', log)
+        self.assertIn('--build-arg REVISION=' + 'a' * 40, log)
+        self.assertIn('--build-arg SOURCE=https://github.com/ExampleOwner/sub2api', log)
+        self.assertIn('bridge', log)
 
     def test_published_full_and_simple_image_tags(self):
         fake_bin = Path('bin')
@@ -175,16 +180,19 @@ class ReleaseMatrixTest(unittest.TestCase):
                 subprocess.run(['bash', str(ROOT / '.github/release-tools/release-images.sh')], env=env, check=True)
                 log = log_path.read_text()
                 self.assertIn('--push', log)
-                self.assertEqual(log.count('buildx build'), 1 if simple else 2)
+                self.assertEqual(log.count('buildx build'), 2 if simple else 4)
+                self.assertIn('ghcr.io/exampleowner/sub2api-bridge', log)
                 if simple:
                     self.assertNotIn('fixturehub', log)
                     self.assertNotIn('imagetools', log)
                     self.assertIn('ghcr.io/exampleowner/sub2api:latest', log)
+                    self.assertIn('ghcr.io/exampleowner/sub2api-bridge:latest', log)
                 else:
-                    self.assertEqual(log.count('imagetools create'), 2)
+                    self.assertEqual(log.count('imagetools create'), 4)
                     self.assertIn('fixturehub/sub2api:9.8', log)
+                    self.assertIn('fixturehub/sub2api-bridge:9.8', log)
                     self.assertIn('ghcr.io/exampleowner/sub2api:9', log)
-
+                    self.assertIn('ghcr.io/exampleowner/sub2api-bridge:9', log)
 
 
 if __name__ == '__main__':

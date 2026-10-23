@@ -390,6 +390,11 @@ export default {
     currentBalance: 'Current Balance',
     groupFallback: 'Group #{id}',
     rechargeAccount: 'Recharge Account',
+    autoRecharge: {
+      title: 'WeChat Pay / Alipay automatic top-up',
+      description: 'Choose a fixed amount and pay at checkout. Your balance is credited automatically after payment confirmation; no card code or manual support step is needed.',
+      action: 'Open automatic top-up',
+    },
     activeSubscription: 'Active Subscription',
     noActiveSubscription: 'No active subscription',
     tabTopUp: 'Top Up',

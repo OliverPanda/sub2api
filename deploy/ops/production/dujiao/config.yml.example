@@ -1,0 +1,158 @@
+# Dujiao-Next production template. bootstrap-server.sh replaces the __TOKEN__
+# placeholders once and never overwrites an existing config.yml.
+app:
+  secret_key: __DUJIAO_APP_SECRET__
+  totp_issuer: XDDAPI
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: release
+  trusted_proxies:
+    - 172.30.0.10/32
+
+log:
+  dir: /app/logs
+  filename: app.log
+  max_size_mb: 100
+  max_backups: 7
+  max_age_days: 30
+  compress: true
+
+database:
+  driver: postgres
+  dsn: postgres://__DUJIAO_POSTGRES_USER__:__DUJIAO_POSTGRES_PASSWORD__@dujiao-postgres:5432/__DUJIAO_POSTGRES_DB__?sslmode=disable
+  pool:
+    max_open_conns: 40
+    max_idle_conns: 10
+    conn_max_lifetime_seconds: 1800
+    conn_max_idle_time_seconds: 300
+
+jwt:
+  secret: __DUJIAO_JWT_SECRET__
+  expire_hours: 24
+
+user_jwt:
+  secret: __DUJIAO_USER_JWT_SECRET__
+  expire_hours: 24
+  remember_me_expire_hours: 168
+
+bootstrap:
+  default_admin_username: ""
+  default_admin_password: ""
+
+telegram_auth:
+  enabled: false
+  bot_username: ""
+  bot_token: ""
+  client_secret: ""
+  oidc_redirect_uri: ""
+  mini_app_url: ""
+  login_expire_seconds: 300
+  replay_ttl_seconds: 300
+
+google_auth:
+  enabled: false
+  client_id: ""
+
+redis:
+  enabled: true
+  host: dujiao-redis
+  port: 6379
+  password: __DUJIAO_REDIS_PASSWORD__
+  db: 0
+  prefix: "xdd"
+
+queue:
+  enabled: true
+  host: dujiao-redis
+  port: 6379
+  password: __DUJIAO_REDIS_PASSWORD__
+  db: 1
+  concurrency: 10
+  queues:
+    default: 10
+    critical: 5
+  upstream_sync_interval: "5m"
+
+upload:
+  max_size: 10485760
+  allowed_types:
+    - image/jpeg
+    - image/png
+    - image/gif
+    - image/webp
+  allowed_extensions:
+    - .jpg
+    - .jpeg
+    - .png
+    - .gif
+    - .webp
+  max_width: 4096
+  max_height: 4096
+
+cors:
+  allowed_origins:
+    - "https://pay.xddapi.org.uk"
+    - "https://api.xddapi.org.uk"
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  allowed_headers:
+    - Content-Type
+    - Content-Length
+    - Accept-Encoding
+    - Authorization
+    - Cache-Control
+    - X-Requested-With
+    - X-CSRF-Token
+  allow_credentials: true
+  max_age: 600
+
+security:
+  login_rate_limit:
+    window_seconds: 300
+    max_attempts: 5
+    block_seconds: 900
+  password_policy:
+    min_length: 12
+    require_upper: true
+    require_lower: true
+    require_number: true
+    require_special: false
+
+email:
+  enabled: false
+  host: ""
+  port: 465
+  username: ""
+  password: ""
+  from: ""
+  from_name: ""
+  use_tls: false
+  use_ssl: true
+  verify_code:
+    expire_minutes: 10
+    send_interval_seconds: 60
+    max_attempts: 5
+    length: 6
+
+order:
+  payment_expire_minutes: 15
+  max_refund_days: 30
+
+reseller:
+  enabled: false
+  main_hosts:
+    - pay.xddapi.org.uk
+  trusted_forwarded_host: true
+  subdomain_base: ""
+  self_apply_enabled: false
+  settlement_confirm_days: 7
+
+web:
+  admin_path: "__DUJIAO_ADMIN_PATH__"

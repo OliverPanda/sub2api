@@ -42,6 +42,7 @@ jobs:
         working-directory: deploy/ops/production
         env:
           SUB2API_IMAGE: ghcr.io/oliverpanda/sub2api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          BRIDGE_IMAGE: ghcr.io/oliverpanda/sub2api-bridge@sha256:0000000000000000000000000000000000000000000000000000000000000000
         run: |
           cp .env.example .env
           sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=test-postgres-password/' .env
@@ -49,7 +50,12 @@ jobs:
           sed -i 's/^ADMIN_PASSWORD=$/ADMIN_PASSWORD=test-admin-password/' .env
           sed -i 's/^JWT_SECRET=$/JWT_SECRET=test-jwt-secret/' .env
           sed -i 's/^TOTP_ENCRYPTION_KEY=$/TOTP_ENCRYPTION_KEY=test-totp-key/' .env
-          printf 'SUB2API_IMAGE=%s\n' "$SUB2API_IMAGE" > release.env
+          sed -i 's/^BRIDGE_ADMIN_TOKEN=$/BRIDGE_ADMIN_TOKEN=test-bridge-admin-token/' .env
+          sed -i 's/^BRIDGE_POSTGRES_PASSWORD=$/BRIDGE_POSTGRES_PASSWORD=test-bridge-postgres-password/' .env
+          sed -i 's/^DUJIAO_POSTGRES_PASSWORD=$/DUJIAO_POSTGRES_PASSWORD=test-dujiao-postgres-password/' .env
+          sed -i 's/^DUJIAO_REDIS_PASSWORD=$/DUJIAO_REDIS_PASSWORD=test-dujiao-redis-password/' .env
+          sed -i 's/^DUJIAO_ADMIN_PASSWORD=$/DUJIAO_ADMIN_PASSWORD=test-dujiao-admin-password/' .env
+          printf 'SUB2API_IMAGE=%s\nBRIDGE_IMAGE=%s\n' "$SUB2API_IMAGE" "$BRIDGE_IMAGE" > release.env
           docker compose --env-file .env --env-file release.env -f docker-compose.yml config --quiet
       - name: Validate production Caddyfile
         run: |
@@ -59,10 +65,12 @@ jobs:
           cp deploy/ops/production/caddy/cloudflare-trusted-proxies.caddy "$tmp/cloudflare-trusted-proxies.caddy"
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
             -subj '/CN=api.xddapi.org.uk' \
+            -addext 'subjectAltName=DNS:api.xddapi.org.uk,DNS:pay.xddapi.org.uk' \
             -keyout "$tmp/certs/origin.key" \
             -out "$tmp/certs/origin.pem" >/dev/null 2>&1
           docker run --rm \
             -e PUBLIC_DOMAIN=api.xddapi.org.uk \
+            -e PAYMENT_DOMAIN=pay.xddapi.org.uk \
             -v "$tmp/Caddyfile:/etc/caddy/Caddyfile:ro" \
             -v "$tmp/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro" \
             -v "$tmp/certs:/etc/caddy/certs:ro" \
@@ -89,6 +97,25 @@ jobs:
       - name: Integration tests
         working-directory: backend
         run: make test-integration
+
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: bridge/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: bridge/go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Test Dujiao Bridge
+        working-directory: bridge
+        run: go test ./...
+      - name: Check Bridge frontend JavaScript
+        run: node --check bridge/static/app.js
 
   frontend:
     runs-on: ubuntu-latest
@@ -139,4 +166,5 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r .github/release-tools/requirements-release.txt
       - run: python -m unittest discover -s .github/release-tools -p 'test_release_matrix.py'
-      - run: bash -n .github/release-tools/release-images.sh
+      - run: python -m unittest discover -s .github/release-tools -p 'test_auto_release.py'
+      - run: bash -n .github/release-tools/release-images.sh .github/release-tools/plan-auto-release.sh

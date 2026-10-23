@@ -414,6 +414,11 @@ export default {
     currentBalance: '当前余额',
     groupFallback: '分组 #{id}',
     rechargeAccount: '充值账户',
+    autoRecharge: {
+      title: '微信 / 支付宝自动充值',
+      description: '选择固定金额并在商城收银台完成支付，支付确认后余额会自动到账，无需复制卡密或联系客服。',
+      action: '打开自动充值',
+    },
     activeSubscription: '当前订阅',
     noActiveSubscription: '暂无有效订阅',
     tabTopUp: '充值',

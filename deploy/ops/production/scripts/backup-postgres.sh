@@ -16,43 +16,62 @@ retention_days=${retention_days:-14}
 mkdir -p "$backup_dir"
 chmod 0700 "$backup_dir"
 
-if [[ -z "$(compose ps -q postgres 2>/dev/null || true)" ]]; then
-  die "postgres service is not running; refusing to continue without a backup"
-fi
-
 stamp=$(date -u +'%Y%m%dT%H%M%SZ')
-base="${backup_dir}/sub2api-${stamp}-${label}-$$"
-tmp="${base}.dump.tmp"
-final="${base}.dump"
+bundle="${backup_dir}/sub2api-${stamp}-${label}-$$"
+mkdir -m 0700 "$bundle"
 
 cleanup() {
-  rm -f "$tmp"
+  rm -rf "$bundle"
 }
 trap cleanup EXIT
 
-log INFO "Creating PostgreSQL backup ${final}"
-# Variables are intentionally expanded inside the PostgreSQL container.
-# shellcheck disable=SC2016
-if ! compose exec -T postgres sh -eu -c \
-  'exec pg_dump --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom --compress=6 --no-owner --no-acl' \
-  > "$tmp"; then
-  die "pg_dump failed"
-fi
+backup_database() {
+  local service=$1 name=$2 tmp="${bundle}/${name}.dump.tmp" final="${bundle}/${name}.dump"
 
-[[ -s "$tmp" ]] || die "pg_dump produced an empty archive"
-if ! compose exec -T postgres pg_restore --list < "$tmp" > /dev/null; then
-  die "backup verification with pg_restore --list failed"
-fi
+  if [[ -z "$(compose ps -q "$service" 2>/dev/null || true)" ]]; then
+    die "${service} is not running; refusing to continue without a complete backup"
+  fi
 
-chmod 0600 "$tmp"
-mv "$tmp" "$final"
-sha256sum "$final" > "${final}.sha256"
-chmod 0600 "${final}.sha256"
+  log INFO "Creating ${name} PostgreSQL backup ${final}"
+  # Variables are intentionally expanded inside the PostgreSQL container.
+  # shellcheck disable=SC2016
+  if ! compose exec -T "$service" sh -eu -c \
+    'exec pg_dump --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom --compress=6 --no-owner --no-acl' \
+    > "$tmp"; then
+    die "pg_dump failed for ${name}"
+  fi
 
-# Retention is applied only after a verified backup has been committed.
+  [[ -s "$tmp" ]] || die "pg_dump produced an empty archive for ${name}"
+  if ! compose exec -T "$service" pg_restore --list < "$tmp" > /dev/null; then
+    die "backup verification with pg_restore --list failed for ${name}"
+  fi
+
+  chmod 0600 "$tmp"
+  mv "$tmp" "$final"
+  sha256sum "$final" > "${final}.sha256"
+  chmod 0600 "${final}.sha256"
+}
+
+backup_database postgres sub2api
+backup_database bridge-postgres bridge
+backup_database dujiao-postgres dujiao
+
+{
+  printf 'created_at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  printf 'label=%s\n' "$label"
+  for dump in "$bundle"/*.dump; do
+    printf '%s  %s\n' "$(sha256sum "$dump" | awk '{print $1}')" "$(basename "$dump")"
+  done
+} > "${bundle}/SHA256SUMS"
+chmod 0600 "${bundle}/SHA256SUMS"
+
+# Retention is applied only after all three verified backups have been
+# committed. Remove both the current bundle format and legacy flat dumps.
+find "$backup_dir" -mindepth 1 -maxdepth 1 -type d -name 'sub2api-*' \
+  -mtime "+${retention_days}" -exec rm -rf {} +
 find "$backup_dir" -type f \( -name 'sub2api-*.dump' -o -name 'sub2api-*.dump.sha256' \) \
   -mtime "+${retention_days}" -delete
 
 trap - EXIT
-log INFO "PostgreSQL backup verified: ${final}"
-printf '%s\n' "$final"
+log INFO "PostgreSQL backups verified: ${bundle}"
+printf '%s\n' "$bundle"

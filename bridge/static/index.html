@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <title>XDD API 充值</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="brand-row">
+        <div class="brand-mark">XDD</div>
+        <div>
+          <p class="eyebrow">XDD API</p>
+          <h1>账户充值</h1>
+        </div>
+      </div>
+      <div id="account" class="account-card" aria-live="polite">
+        <span class="muted">正在验证登录状态…</span>
+      </div>
+    </header>
+
+    <section id="login-error" class="notice error hidden" role="alert">
+      <strong>无法识别当前账号</strong>
+      <p>请回到 XDD API 控制台重新打开充值页。为了安全，本页面不会要求你再次输入密码。</p>
+    </section>
+
+    <section id="recharge" class="panel hidden" aria-labelledby="recharge-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">STEP 1</p>
+          <h2 id="recharge-title">选择充值金额</h2>
+        </div>
+        <span class="safe-badge">服务端校验价格</span>
+      </div>
+      <div id="skus" class="sku-grid"></div>
+
+      <div id="quantity-row" class="quantity-row">
+        <label for="quantity">数量</label>
+        <div class="stepper">
+          <button id="qty-minus" class="icon-button" type="button" aria-label="减少数量">−</button>
+          <input id="quantity" type="number" inputmode="numeric" value="1" min="1" max="1" aria-label="购买数量">
+          <button id="qty-plus" class="icon-button" type="button" aria-label="增加数量">＋</button>
+        </div>
+        <span id="quantity-hint" class="muted"></span>
+      </div>
+
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">STEP 2</p>
+          <h2>选择支付方式</h2>
+        </div>
+      </div>
+      <div id="channels" class="channel-grid" aria-live="polite"></div>
+
+      <div class="summary">
+        <div>
+          <span class="muted">应付金额</span>
+          <strong id="total-price">—</strong>
+        </div>
+        <button id="submit" class="primary" type="button">立即充值</button>
+      </div>
+      <p class="fineprint">点击充值后将跳转到商城收银台。支付成功后由 Bridge 自动核验并充值；重复回调不会重复加余额。</p>
+    </section>
+
+    <section id="payment" class="panel payment-panel hidden" aria-labelledby="payment-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">PAYMENT</p>
+          <h2 id="payment-title">完成支付</h2>
+        </div>
+        <span id="payment-status" class="status pending">等待支付</span>
+      </div>
+      <div class="payment-body">
+        <div id="qr-wrap" class="qr-wrap hidden"><img id="qr-image" alt="支付二维码"></div>
+        <div class="payment-copy">
+          <p id="payment-message" class="payment-message">请在支付页面完成付款，成功后无需关闭本页。</p>
+          <a id="pay-link" class="primary link-button hidden" target="_blank" rel="noopener noreferrer">打开支付页面</a>
+          <a id="console-link" class="primary link-button hidden" href="/">返回 XDD API 控制台</a>
+          <button id="refresh-payment" class="secondary" type="button">我已支付，立即查询</button>
+          <a id="support-link" class="text-button support-link hidden" target="_blank" rel="noopener noreferrer">联系客服</a>
+          <p id="payment-meta" class="muted"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel history-panel" aria-labelledby="history-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">ORDERS</p>
+          <h2 id="history-title">充值记录</h2>
+        </div>
+        <button id="reload-orders" class="text-button" type="button">刷新</button>
+      </div>
+      <div id="orders" class="orders"><span class="muted">正在加载…</span></div>
+    </section>
+
+    <footer>
+      <span>余额到账仅以服务端核验后的结果为准</span>
+      <span class="dot">·</span>
+      <a id="footer-support" class="footer-link hidden" target="_blank" rel="noopener noreferrer">遇到问题请联系 XDD API 管理员</a>
+      <span id="footer-support-hint">遇到问题请联系 XDD API 管理员</span>
+    </footer>
+  </main>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
