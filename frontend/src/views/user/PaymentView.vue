@@ -45,14 +45,14 @@
               <p class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ user?.username || '' }}</p>
               <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">{{ t('payment.currentBalance') }}: {{ user?.balance?.toFixed(2) || '0.00' }}</p>
             </div>
-            <!-- Same-origin automatic top-up bridge. It reads the existing
-                 auth_token from localStorage; no JWT is passed in the URL. -->
-            <div class="card flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <!-- Native Alipay top-up status. The recharge form below creates
+                 and credits the order directly, so no external bridge is needed. -->
+            <div v-if="visibleMethods.alipay" class="card flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.autoRecharge.title') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ t('payment.autoRecharge.description') }}</p>
               </div>
-              <a href="/shop/" class="btn shrink-0 px-4 py-2.5 text-center text-sm font-medium">{{ t('payment.autoRecharge.action') }}</a>
+              <span class="badge badge-success shrink-0">{{ t('payment.autoRecharge.enabled') }}</span>
             </div>
             <div v-if="enabledMethods.length === 0" class="card py-16 text-center">
               <p class="text-gray-500 dark:text-gray-400">{{ t('payment.notAvailable') }}</p>
@@ -68,7 +68,7 @@
               ></div>
               <AmountInput
                 v-model="amount"
-                :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                :amounts="[5, 10, 20, 50, 100, 200, 300, 500]"
                 :min="globalMinAmount"
                 :max="globalMaxAmount"
                 :bonus-tiers="rechargeBonusTiers"

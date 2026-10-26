@@ -67,6 +67,16 @@ describe('describePaymentScenarioError', () => {
       hintKey: 'payment.errors.alipayDesktopQrHint',
     })
   })
+
+  it('shows the EasyPay domain authorization blocker instead of browser QR guidance', () => {
+    expect(describePaymentScenarioError(
+      new Error('payment gateway error: easypay error: 该域名不可发起支付，原因：域名没过白，请前往支付平台授权支付域名'),
+      { paymentMethod: 'alipay', isMobile: false, isWechatBrowser: false },
+    )).toEqual({
+      messageKey: 'payment.errors.easypayDomainNotAuthorized',
+      hintKey: 'payment.errors.easypayDomainAuthorizationHint',
+    })
+  })
 })
 
 describe('buildPaymentErrorToastMessage', () => {

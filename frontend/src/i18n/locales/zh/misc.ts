@@ -415,9 +415,9 @@ export default {
     groupFallback: '分组 #{id}',
     rechargeAccount: '充值账户',
     autoRecharge: {
-      title: '微信 / 支付宝自动充值',
-      description: '选择固定金额并在商城收银台完成支付，支付确认后余额会自动到账，无需复制卡密或联系客服。',
-      action: '打开自动充值',
+      title: '支付宝自动充值',
+      description: '在下方选择或输入金额，使用支付宝扫码支付；支付确认后余额会自动到账，无需复制卡密或联系客服。',
+      enabled: '支付宝渠道已开启',
     },
     activeSubscription: '当前订阅',
     noActiveSubscription: '暂无有效订阅',
@@ -453,6 +453,8 @@ export default {
       mobilePaymentFallbackToQr: '当前商户未开通移动支付，已自动切换为扫码支付。',
       alipayDesktopUnavailable: '当前支付宝桌面支付未成功生成二维码。',
       alipayDesktopQrHint: '电脑端支付宝应展示扫码单，请刷新后重试，或确认浏览器未拦截当前支付页。',
+      easypayDomainNotAuthorized: '易支付尚未放行当前支付域名。',
+      easypayDomainAuthorizationHint: '请在易支付后台确认支付域名授权状态为“正常”后重试；这不是浏览器拦截导致的。',
       alipayMobileUnavailable: '当前页面未成功跳转到支付宝。',
       alipayMobileOpenHint: '请允许当前页面打开支付宝 App，或改用系统浏览器重新发起支付。',
       // Structured error codes (reason strings from backend ApplicationError)

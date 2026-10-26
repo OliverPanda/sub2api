@@ -391,9 +391,9 @@ export default {
     groupFallback: 'Group #{id}',
     rechargeAccount: 'Recharge Account',
     autoRecharge: {
-      title: 'WeChat Pay / Alipay automatic top-up',
-      description: 'Choose a fixed amount and pay at checkout. Your balance is credited automatically after payment confirmation; no card code or manual support step is needed.',
-      action: 'Open automatic top-up',
+      title: 'Alipay automatic top-up',
+      description: 'Choose or enter an amount below and pay by scanning the Alipay QR code. Your balance is credited automatically after payment confirmation; no card code or manual support step is needed.',
+      enabled: 'Alipay enabled',
     },
     activeSubscription: 'Active Subscription',
     noActiveSubscription: 'No active subscription',
@@ -429,6 +429,8 @@ export default {
       mobilePaymentFallbackToQr: 'This merchant has not enabled mobile payment. The flow has been switched to QR payment automatically.',
       alipayDesktopUnavailable: 'The desktop Alipay flow could not generate a QR code.',
       alipayDesktopQrHint: 'Desktop Alipay should render a QR code. Refresh and retry, or make sure the payment page was not blocked.',
+      easypayDomainNotAuthorized: 'EasyPay has not authorized the current payment domain yet.',
+      easypayDomainAuthorizationHint: 'Confirm that the payment domain is approved in the EasyPay dashboard and retry. Browser blocking is not the cause.',
       alipayMobileUnavailable: 'This page could not hand off to Alipay.',
       alipayMobileOpenHint: 'Allow the current page to open the Alipay app, or retry from the system browser.',
       // Structured error codes (reason strings from backend ApplicationError)

@@ -43,6 +43,13 @@ function defaultAlipayHint(context: PaymentScenarioContext): string {
   return 'payment.errors.alipayDesktopQrHint'
 }
 
+function isEasyPayDomainAuthorizationError(normalizedMessage: string): boolean {
+  return normalizedMessage.includes('该域名不可发起支付')
+    || normalizedMessage.includes('域名没过白')
+    || normalizedMessage.includes('授权支付域名')
+    || normalizedMessage.includes('payment domain is not authorized')
+}
+
 export function describePaymentScenarioError(
   error: unknown,
   context: PaymentScenarioContext,
@@ -97,6 +104,13 @@ export function describePaymentScenarioError(
         messageKey: 'payment.errors.wechatUnavailable',
         hintKey: defaultWechatHint(context),
       }
+    }
+  }
+
+  if (method === 'alipay' && isEasyPayDomainAuthorizationError(normalizedMessage)) {
+    return {
+      messageKey: 'payment.errors.easypayDomainNotAuthorized',
+      hintKey: 'payment.errors.easypayDomainAuthorizationHint',
     }
   }
 

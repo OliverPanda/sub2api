@@ -15,6 +15,17 @@ function mountInput(value: number | null = null) {
 }
 
 describe('recharge amount input', () => {
+  it('offers the configured recharge tiers and selects the clicked amount', async () => {
+    const wrapper = mountInput()
+
+    expect(wrapper.findAll('button').map((button) => button.text())).toEqual([
+      '5', '10', '20', '50', '100', '200', '300', '500',
+    ])
+
+    await wrapper.get('[data-testid="quick-amount-5"]').trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toEqual([[5]])
+  })
+
   it.each(['10abc', '10.555', '-10', '1e2'])('restores the accepted amount after rejecting %s', async (value) => {
     const wrapper = mountInput(10)
     const input = wrapper.get('input')
