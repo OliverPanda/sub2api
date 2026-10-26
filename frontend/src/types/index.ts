@@ -1094,6 +1094,31 @@ export interface UpstreamBillingData {
   effective_rate_multiplier: number
   timezone?: string
   observed_at: string
+  // Optional upstream wallet / key-quota figures; absent on older upstreams.
+  balance?: number
+  quota?: number
+  quota_used?: number
+}
+
+export interface UpstreamBalanceItem {
+  account_id: number
+  name: string
+  platform: string
+  status: string
+  balance?: number
+  currency?: string
+  has_balance: boolean
+  received_at?: string
+  stale?: boolean
+  probe_status?: string
+  last_error?: string
+}
+
+export interface UpstreamBalancesResponse {
+  items: UpstreamBalanceItem[]
+  total: number
+  has_total: boolean
+  probe_failed: number
 }
 
 export type UpstreamBillingProbeStatus = 'ok' | 'unsupported' | 'failed'

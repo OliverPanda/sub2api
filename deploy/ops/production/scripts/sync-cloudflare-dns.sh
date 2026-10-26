@@ -3,14 +3,14 @@ set -Eeuo pipefail
 
 zone_id=${CLOUDFLARE_ZONE_ID:-}
 api_token=${CLOUDFLARE_API_TOKEN:-}
-# New deployments manage the API and payment hostnames together. The singular
-# variable is retained as a compatibility fallback for older bootstrap installs.
+# The API hostname is the only hostname managed by a normal deployment. Retired
+# payment hostnames are not updated or deleted automatically.
 records_raw=${CLOUDFLARE_DNS_RECORD_NAMES:-}
 if [[ -z "$records_raw" ]]; then
   records_raw=${CLOUDFLARE_DNS_RECORD_NAME:-}
 fi
 if [[ -z "$records_raw" ]]; then
-  records_raw='api.xddapi.org.uk pay.xddapi.org.uk'
+  records_raw='api.xddapi.org.uk'
 fi
 ipv4=${ORIGIN_IPV4:-149.104.31.126}
 ipv6=${ORIGIN_IPV6:-2001:df1:7880:2::3a7}

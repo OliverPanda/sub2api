@@ -24,6 +24,7 @@ import type {
   CheckMixedChannelRequest,
   CheckMixedChannelResponse,
   UpstreamBillingProbeResult,
+  UpstreamBalancesResponse,
   UpstreamBillingProbeSettings,
   UpstreamBillingRatesResponse,
   OllamaCloudUsageSettings,
@@ -1055,6 +1056,13 @@ export async function probeUpstreamBillingBatch(accountIds: number[]): Promise<U
   return data.results
 }
 
+export async function getUpstreamBalances(page = 1, pageSize = 100): Promise<UpstreamBalancesResponse> {
+  const { data } = await apiClient.get<UpstreamBalancesResponse>('/admin/accounts/upstream-balances', {
+    params: { page, page_size: pageSize }
+  })
+  return data
+}
+
 export async function getOllamaCloudUsageSettings(): Promise<OllamaCloudUsageSettings> {
   const { data } = await apiClient.get<OllamaCloudUsageSettings>('/admin/accounts/ollama-cloud-usage/settings')
   return data
@@ -1188,6 +1196,7 @@ export const accountsAPI = {
   setUpstreamBillingProbeEnabled,
   probeUpstreamBilling,
   probeUpstreamBillingBatch,
+  getUpstreamBalances,
   getOllamaCloudUsageSettings,
   updateOllamaCloudUsageSettings,
   getOllamaCloudUsage,

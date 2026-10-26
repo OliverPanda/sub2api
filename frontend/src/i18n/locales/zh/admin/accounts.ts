@@ -216,7 +216,22 @@ export default {
         noEligibleAccounts: '请选择 API Key 账号',
         batchLimit: '每次最多探测 20 个账号',
         batchCompleted: '已完成 {count} 个账号的倍率探测',
-        batchPartial: '倍率探测部分完成：成功 {success} 个，失败 {failed} 个'
+        batchPartial: '倍率探测部分完成：成功 {success} 个，失败 {failed} 个',
+        walletBalance: '钱包余额：{value}',
+        keyQuota: 'Key 额度：{value}（已用 {used}）'
+      },
+      upstreamBalances: {
+        title: '上游余额总览',
+        total: '上游总余额（A+B+C）',
+        refresh: '刷新余额',
+        refreshing: '刷新中...',
+        loadFailed: '加载上游余额失败',
+        noData: '暂无余额数据；开启自动探测并等待探测成功后显示。',
+        staleHint: '以下账号的余额快照已过期：',
+        probeFailedHint: '{count} 个账号最近一次探测失败，其余额未计入总额。',
+        partialHint: '部分账号未上报余额，总余额仅包含已探测成功的账号。',
+        receivedAt: '更新于：{value}',
+        unknown: '未知'
       },
       allPrivacyModes: '全部Privacy状态',
       privacyUnset: '未设置',

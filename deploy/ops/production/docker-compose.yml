@@ -1,5 +1,5 @@
-# Production single-host deployment for XDD API, its payment bridge, and
-# the pinned Dujiao-Next payment backend.
+# Production single-host deployment for XDD API.
+# Payment is handled by Sub2API's native payment providers.
 name: xdd-api
 
 x-logging: &default-logging
@@ -8,12 +8,6 @@ x-logging: &default-logging
     max-size: "20m"
     max-file: "5"
 
-x-postgres-healthcheck: &postgres-healthcheck
-  interval: 10s
-  timeout: 5s
-  retries: 10
-  start_period: 20s
-
 services:
   caddy:
     image: caddy:2.10.2-alpine
@@ -21,15 +15,10 @@ services:
     depends_on:
       sub2api:
         condition: service_healthy
-      bridge:
-        condition: service_healthy
-      dujiao-next:
-        condition: service_healthy
     ports:
       - "443:443"
     environment:
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-api.xddapi.org.uk}
-      PAYMENT_DOMAIN: ${PAYMENT_DOMAIN:-pay.xddapi.org.uk}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro
@@ -154,153 +143,6 @@ services:
     stop_grace_period: 30s
     logging: *default-logging
 
-  bridge:
-    image: ${BRIDGE_IMAGE:?BRIDGE_IMAGE must be pinned by deploy-release.sh}
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    env_file:
-      - .env
-    environment:
-      BRIDGE_HTTP_ADDR: ":8080"
-      BRIDGE_PUBLIC_URL: "https://${PUBLIC_DOMAIN:-api.xddapi.org.uk}"
-      BRIDGE_DATABASE_URL: "postgres://${BRIDGE_POSTGRES_USER:-bridge}:${BRIDGE_POSTGRES_PASSWORD:?BRIDGE_POSTGRES_PASSWORD is required}@bridge-postgres:5432/${BRIDGE_POSTGRES_DB:-bridge}?sslmode=disable"
-      SUB2API_BASE_URL: "http://sub2api:8080"
-      DUJIAO_BASE_URL: "http://dujiao-next:8080"
-      BRIDGE_SKU_CONFIG: "/app/config/skus.json"
-    expose:
-      - "8080"
-    volumes:
-      - ./bridge/config:/app/config:ro
-    depends_on:
-      bridge-postgres:
-        condition: service_healthy
-      sub2api:
-        condition: service_healthy
-      dujiao-next:
-        condition: service_healthy
-    networks:
-      - edge
-      - bridge_backend
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 18
-      start_period: 15s
-    stop_grace_period: 20s
-    logging: *default-logging
-
-  bridge-postgres:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      POSTGRES_USER: "${BRIDGE_POSTGRES_USER:-bridge}"
-      POSTGRES_PASSWORD: "${BRIDGE_POSTGRES_PASSWORD:?BRIDGE_POSTGRES_PASSWORD is required}"
-      POSTGRES_DB: "${BRIDGE_POSTGRES_DB:-bridge}"
-    command:
-      - postgres
-      - -c
-      - max_connections=80
-    volumes:
-      - ./bridge_postgres_data:/var/lib/postgresql
-    networks:
-      - bridge_backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      <<: *postgres-healthcheck
-    stop_grace_period: 60s
-    logging: *default-logging
-
-  dujiao-next:
-    # Pinned deliberately: payment backend upgrades are a separate maintenance
-    # operation and must never be coupled to an application release.
-    image: ${DUJIAO_IMAGE:?DUJIAO_IMAGE must be pinned to a released digest}
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      TZ: "${TZ:-Asia/Shanghai}"
-      DJ_DEFAULT_ADMIN_USERNAME: "${DUJIAO_ADMIN_USERNAME:?DUJIAO_ADMIN_USERNAME is required}"
-      DJ_DEFAULT_ADMIN_PASSWORD: "${DUJIAO_ADMIN_PASSWORD:?DUJIAO_ADMIN_PASSWORD is required}"
-    volumes:
-      - ./dujiao/config.yml:/app/config.yml:ro
-      - ./dujiao_data:/app/db
-      - ./dujiao_uploads:/app/uploads
-      - ./dujiao_logs:/app/logs
-    expose:
-      - "8080"
-    depends_on:
-      dujiao-postgres:
-        condition: service_healthy
-      dujiao-redis:
-        condition: service_healthy
-    networks:
-      - edge
-      - dujiao_backend
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 18
-      start_period: 30s
-    stop_grace_period: 30s
-    logging: *default-logging
-
-  dujiao-postgres:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      POSTGRES_USER: "${DUJIAO_POSTGRES_USER:-dujiao}"
-      POSTGRES_PASSWORD: "${DUJIAO_POSTGRES_PASSWORD:?DUJIAO_POSTGRES_PASSWORD is required}"
-      POSTGRES_DB: "${DUJIAO_POSTGRES_DB:-dujiao}"
-    command:
-      - postgres
-      - -c
-      - max_connections=80
-    volumes:
-      - ./dujiao_postgres_data:/var/lib/postgresql
-    networks:
-      - dujiao_backend
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      <<: *postgres-healthcheck
-    stop_grace_period: 60s
-    logging: *default-logging
-
-  dujiao-redis:
-    image: redis:8-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      REDIS_PASSWORD: "${DUJIAO_REDIS_PASSWORD:?DUJIAO_REDIS_PASSWORD is required}"
-    command:
-      - sh
-      - -ec
-      - |
-        exec redis-server \
-          --appendonly yes \
-          --appendfsync everysec \
-          --save 60 1 \
-          --requirepass "$${REDIS_PASSWORD}"
-    volumes:
-      - ./dujiao_redis_data:/data
-    networks:
-      - dujiao_backend
-    healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 8
-      start_period: 10s
-    stop_grace_period: 30s
-    logging: *default-logging
-
 networks:
   edge:
     driver: bridge
@@ -309,10 +151,3 @@ networks:
         - subnet: 172.30.0.0/24
   backend:
     driver: bridge
-    internal: true
-  bridge_backend:
-    driver: bridge
-    internal: true
-  dujiao_backend:
-    driver: bridge
-    internal: true

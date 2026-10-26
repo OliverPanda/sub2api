@@ -1350,12 +1350,6 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	currentTurnReplayInput := []json.RawMessage(nil)
 	currentTurnReplayInputExists := false
 	skipBeforeTurn := false
-	hasCurrentOrReplayFunctionCallOutput := func(payload []byte) bool {
-		if openAIWSRawPayloadHasToolCallOutput(payload) {
-			return true
-		}
-		return currentTurnReplayInputExists && openAIWSRawItemsHasFunctionCallOutput(currentTurnReplayInput)
-	}
 	resetSessionLease := func(markBroken bool) {
 		if sessionLease == nil {
 			return
@@ -1375,22 +1369,16 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		if turnPrevRecoveryTried || !s.openAIWSIngressPreviousResponseRecoveryEnabled() {
 			return false
 		}
-		// 携带 function_call_output 的请求不能丢弃 previous_response_id：
-		// 上游 API 需要 response chain 来匹配 tool_result 与之前的 tool_use，
-		// 丢弃后会导致 "No tool call found for function call output" 400 错误。
-		if hasCurrentOrReplayFunctionCallOutput(currentPayload) {
-			return false
-		}
-		if isStrictAffinityTurn(currentPayload) {
-			// Layer 2：严格亲和链路命中 previous_response_not_found 时，降级为“去掉 previous_response_id 后重放一次”。
-			// 该错误说明续链锚点已失效，继续 strict fail-close 只会直接中断本轮请求。
+		// 没有完整 replay 序列时删掉 previous_response_id 会静默丢失上下文。
+		// 此时 fail-close，让客户端看到明确错误，而不是把会话降级成单条消息。
+		if !currentTurnReplayInputExists {
 			logOpenAIWSModeInfo(
-				"ingress_ws_prev_response_recovery_layer2 account_id=%d turn=%d conn_id=%s store_disabled_conn_mode=%s action=drop_previous_response_id_retry",
+				"ingress_ws_prev_response_recovery_skip account_id=%d turn=%d conn_id=%s reason=incomplete_replay_context missing_turn_replay_input=true",
 				account.ID,
 				turn,
 				truncateOpenAIWSLogValue(connID, openAIWSIDValueMaxLen),
-				normalizeOpenAIWSLogValue(storeDisabledConnMode),
 			)
+			return false
 		}
 		turnPrevRecoveryTried = true
 		updatedPayload, removed, dropErr := dropPreviousResponseIDFromRawPayload(currentPayload)
@@ -1422,6 +1410,24 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				truncateOpenAIWSLogValue(setInputErr.Error(), openAIWSLogValueMaxLen),
 			)
 			return false
+		}
+		if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(updatedWithInput) {
+			logOpenAIWSModeInfo(
+				"ingress_ws_prev_response_recovery_skip account_id=%d turn=%d conn_id=%s reason=incomplete_replay_context",
+				account.ID,
+				turn,
+				truncateOpenAIWSLogValue(connID, openAIWSIDValueMaxLen),
+			)
+			return false
+		}
+		if isStrictAffinityTurn(currentPayload) {
+			logOpenAIWSModeInfo(
+				"ingress_ws_prev_response_recovery_layer2 account_id=%d turn=%d conn_id=%s store_disabled_conn_mode=%s action=drop_previous_response_id_retry",
+				account.ID,
+				turn,
+				truncateOpenAIWSLogValue(connID, openAIWSIDValueMaxLen),
+				normalizeOpenAIWSLogValue(storeDisabledConnMode),
+			)
 		}
 		logOpenAIWSModeInfo(
 			"ingress_ws_prev_response_recovery account_id=%d turn=%d conn_id=%s action=drop_previous_response_id retry=1",
@@ -1646,6 +1652,16 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 							truncateOpenAIWSLogValue(setInputErr.Error(), openAIWSLogValueMaxLen),
 							hasFunctionCallOutput,
 						)
+					} else if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(updatedWithInput) {
+						logOpenAIWSModeInfo(
+							"ingress_ws_prev_response_strict_eval account_id=%d turn=%d conn_id=%s action=keep_previous_response_id reason=incomplete_replay_context previous_response_id=%s expected_previous_response_id=%s has_function_call_output=%v",
+							account.ID,
+							turn,
+							truncateOpenAIWSLogValue(sessionConnID, openAIWSIDValueMaxLen),
+							truncateOpenAIWSLogValue(currentPreviousResponseID, openAIWSIDValueMaxLen),
+							truncateOpenAIWSLogValue(expectedPrev, openAIWSIDValueMaxLen),
+							hasFunctionCallOutput,
+						)
 					} else {
 						currentPayload = updatedWithInput
 						currentPayloadBytes = len(updatedWithInput)
@@ -1701,7 +1717,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					hasReplayToolContext := hasFCOutput &&
 						currentTurnReplayInputExists &&
 						openAIWSRawItemsHaveToolCallContextForOutputs(currentTurnReplayInput)
-					if !turnPrevRecoveryTried && currentPreviousResponseID != "" && (!hasFCOutput || hasReplayToolContext) {
+					if !turnPrevRecoveryTried && currentPreviousResponseID != "" && currentTurnReplayInputExists && (!hasFCOutput || hasReplayToolContext) {
 						updatedPayload, removed, dropErr := dropPreviousResponseIDFromRawPayload(currentPayload)
 						if dropErr != nil || !removed {
 							reason := "not_removed"
@@ -1731,6 +1747,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 									truncateOpenAIWSLogValue(currentPreviousResponseID, openAIWSIDValueMaxLen),
 									truncateOpenAIWSLogValue(setInputErr.Error(), openAIWSLogValueMaxLen),
 								)
+							} else if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(updatedWithInput) {
+								logOpenAIWSModeInfo(
+									"ingress_ws_preflight_ping_recovery_skip account_id=%d turn=%d conn_id=%s reason=incomplete_replay_context previous_response_id=%s has_function_call_output=%v",
+									account.ID,
+									turn,
+									truncateOpenAIWSLogValue(sessionConnID, openAIWSIDValueMaxLen),
+									truncateOpenAIWSLogValue(currentPreviousResponseID, openAIWSIDValueMaxLen),
+									hasFCOutput,
+								)
 							} else {
 								logOpenAIWSModeInfo(
 									"ingress_ws_preflight_ping_recovery account_id=%d turn=%d conn_id=%s action=drop_previous_response_id_retry previous_response_id=%s has_function_call_output=%v has_replay_tool_context=%v",
@@ -1750,10 +1775,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 							}
 						}
 					}
-					if hasFCOutput && currentPreviousResponseID != "" {
-						reason := "function_call_output_missing_replay_context"
+					if currentPreviousResponseID != "" {
+						reason := "replay_context_incomplete"
 						if hasReplayToolContext {
 							reason = "function_call_output_replay_not_applied"
+						} else if hasFCOutput {
+							reason = "function_call_output_missing_replay_context"
 						}
 						logOpenAIWSModeInfo(
 							"ingress_ws_preflight_ping_recovery_skip account_id=%d turn=%d conn_id=%s reason=%s action=fail_close previous_response_id=%s has_replay_tool_context=%v",

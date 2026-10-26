@@ -201,12 +201,46 @@ func TestSanitizeGrokCompactionReplayBodyPreservesVisibleSummary(t *testing.T) {
 	patched, changed, err := sanitizeGrokCompactionReplayBody(body)
 	require.NoError(t, err)
 	require.True(t, changed)
-	require.False(t, gjson.GetBytes(patched, "previous_response_id").Exists())
+	// A visible summary plus the current user message is not enough to prove that
+	// the complete prior context can be replayed. Keep the anchor rather than
+	// silently degrading the request to a fresh conversation.
+	require.Equal(t, "resp_stale", gjson.GetBytes(patched, "previous_response_id").String())
 	require.False(t, gjson.GetBytes(patched, `input.#(type=="reasoning")`).Exists())
 	require.Contains(t, gjson.GetBytes(patched, "input.0.content.0.text").String(), "visible history")
 	require.Equal(t, "continue", gjson.GetBytes(patched, "input.1.content").String())
 	require.True(t, isGrokCompactionReplayDecodeError(http.StatusBadRequest, []byte(`{"error":{"message":"failed to deserialize compaction summary history"}}`)))
 	require.True(t, isGrokCompactionReplayDecodeError(http.StatusBadRequest, []byte(`{"error":{"type":"invalid_request_error"},"detail":"could not decode compaction blob"}`)))
+}
+
+func TestSanitizeGrokCompactionReplayBodyDropsAnchorOnlyWithFullHistory(t *testing.T) {
+	body := []byte(`{
+		"previous_response_id":"resp_stale",
+		"input":[
+			{"type":"message","role":"user","content":"first"},
+			{"type":"message","role":"assistant","content":"answer"},
+			{"type":"message","role":"user","content":"continue"}
+		]
+	}`)
+	patched, changed, err := sanitizeGrokCompactionReplayBody(body)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.False(t, gjson.GetBytes(patched, "previous_response_id").Exists())
+	require.False(t, gjson.GetBytes(patched, "store").Bool())
+
+	body = []byte(`{
+		"previous_response_id":"resp_stale",
+		"input":[
+			{"type":"compaction","encrypted_content":"opaque","summary":[{"type":"summary_text","text":"visible history"}]},
+			{"type":"message","role":"user","content":"first"},
+			{"type":"message","role":"assistant","content":"answer"},
+			{"type":"message","role":"user","content":"continue"}
+		]
+	}`)
+	patched, changed, err = sanitizeGrokCompactionReplayBody(body)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.False(t, gjson.GetBytes(patched, "previous_response_id").Exists())
+	require.False(t, gjson.GetBytes(patched, "store").Bool())
 }
 
 func TestGrokStructuredErrorCandidatesDoNotShadowTopLevelMessages(t *testing.T) {

@@ -14,20 +14,25 @@ import (
 const keyBillingInfoSchemaVersion = 1
 
 type keyBillingInfoResponse struct {
-	Object                  string    `json:"object"`
-	SchemaVersion           int       `json:"schema_version"`
-	BillingScope            string    `json:"billing_scope"`
-	GroupRateMultiplier     float64   `json:"group_rate_multiplier"`
-	UserRateMultiplier      *float64  `json:"user_rate_multiplier,omitempty"`
-	ResolvedRateMultiplier  float64   `json:"resolved_rate_multiplier"`
-	PeakRateEnabled         bool      `json:"peak_rate_enabled"`
-	PeakStart               *string   `json:"peak_start,omitempty"`
-	PeakEnd                 *string   `json:"peak_end,omitempty"`
-	PeakRateMultiplier      *float64  `json:"peak_rate_multiplier,omitempty"`
-	AppliedPeakMultiplier   *float64  `json:"applied_peak_multiplier,omitempty"`
-	EffectiveRateMultiplier float64   `json:"effective_rate_multiplier"`
-	Timezone                *string   `json:"timezone,omitempty"`
-	ObservedAt              time.Time `json:"observed_at"`
+	Object                  string   `json:"object"`
+	SchemaVersion           int      `json:"schema_version"`
+	BillingScope            string   `json:"billing_scope"`
+	GroupRateMultiplier     float64  `json:"group_rate_multiplier"`
+	UserRateMultiplier      *float64 `json:"user_rate_multiplier,omitempty"`
+	ResolvedRateMultiplier  float64  `json:"resolved_rate_multiplier"`
+	PeakRateEnabled         bool     `json:"peak_rate_enabled"`
+	PeakStart               *string  `json:"peak_start,omitempty"`
+	PeakEnd                 *string  `json:"peak_end,omitempty"`
+	PeakRateMultiplier      *float64 `json:"peak_rate_multiplier,omitempty"`
+	AppliedPeakMultiplier   *float64 `json:"applied_peak_multiplier,omitempty"`
+	EffectiveRateMultiplier float64  `json:"effective_rate_multiplier"`
+	// Balance is the authenticated user's wallet balance. Only present for
+	// balance-mode keys so probes of subscription/quota-only upstreams omit it.
+	Balance    *float64  `json:"balance,omitempty"`
+	Quota      *float64  `json:"quota,omitempty"`
+	QuotaUsed  *float64  `json:"quota_used,omitempty"`
+	Timezone   *string   `json:"timezone,omitempty"`
+	ObservedAt time.Time `json:"observed_at"`
 }
 
 // KeyBillingInfo returns the token billing multiplier effective for the authenticated API key.
@@ -57,8 +62,23 @@ func (h *GatewayHandler) KeyBillingInfo(c *gin.Context) {
 		return
 	}
 
+	// Balance/quota enrichment is best-effort: the billing rate is the
+	// contract, wallet/quota figures are additive and must not fail the call.
+	subject, hasSubject := middleware2.GetAuthSubjectFromContext(c)
+	var balance *float64
+	if hasSubject && h.userService != nil {
+		if user, err := h.userService.GetByID(c.Request.Context(), subject.UserID); err == nil {
+			balance = &user.Balance
+		}
+	}
+	var quota, quotaUsed *float64
+	if apiKey.Quota > 0 {
+		quota = &apiKey.Quota
+		quotaUsed = &apiKey.QuotaUsed
+	}
+
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, buildKeyBillingInfo(apiKey, resolvedRate, timezone.Now()))
+	c.JSON(http.StatusOK, buildKeyBillingInfo(apiKey, resolvedRate, balance, quota, quotaUsed, timezone.Now()))
 }
 
 func (h *GatewayHandler) resolveKeyBillingRate(c *gin.Context, apiKey *service.APIKey) (float64, bool) {
@@ -77,7 +97,7 @@ func (h *GatewayHandler) resolveKeyBillingRate(c *gin.Context, apiKey *service.A
 	}
 }
 
-func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, now time.Time) keyBillingInfoResponse {
+func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, balance, quota, quotaUsed *float64, now time.Time) keyBillingInfoResponse {
 	groupRate := apiKey.Group.RateMultiplier
 	var userRate *float64
 	if resolvedRate != groupRate {
@@ -94,6 +114,9 @@ func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, now time.
 		ResolvedRateMultiplier:  resolvedRate,
 		PeakRateEnabled:         apiKey.Group.PeakRateEnabled,
 		EffectiveRateMultiplier: resolvedRate * appliedPeak,
+		Balance:                 balance,
+		Quota:                   quota,
+		QuotaUsed:               quotaUsed,
 		ObservedAt:              now.UTC(),
 	}
 	if apiKey.Group.PeakRateEnabled {

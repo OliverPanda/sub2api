@@ -58,7 +58,18 @@ func normalizeOpenAIResponsesLegacyIngressWithConfig(cfg *config.Config, body []
 			if !hasNativeInput {
 				request["input"] = legacy.input
 				applyLegacyResponsesTopLevelFields(request, legacy)
-				delete(request, "previous_response_id")
+				previousResponseID, _ := request["previous_response_id"].(string)
+				if strings.TrimSpace(previousResponseID) == "" {
+					delete(request, "previous_response_id")
+				} else {
+					replayBody, marshalErr := marshalOpenAIUpstreamJSON(request)
+					if marshalErr != nil {
+						return body, false, fmt.Errorf("validate legacy Responses replay context: %w", marshalErr)
+					}
+					if CanReplayOpenAIResponsesInputWithoutPreviousResponseID(replayBody) {
+						delete(request, "previous_response_id")
+					}
+				}
 			}
 		}
 		// messages is not a Responses field. When native input is present but the

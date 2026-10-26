@@ -14,7 +14,6 @@ INSTALL_TAILSCALE=${INSTALL_TAILSCALE:-true}
 REQUIRE_TAILSCALE=${REQUIRE_TAILSCALE:-true}
 CONFIGURE_FIREWALL=${CONFIGURE_FIREWALL:-true}
 PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-api.xddapi.org.uk}
-PAYMENT_DOMAIN=${PAYMENT_DOMAIN:-pay.xddapi.org.uk}
 ORIGIN_CERT_FILE=${ORIGIN_CERT_FILE:-}
 ORIGIN_KEY_FILE=${ORIGIN_KEY_FILE:-}
 
@@ -75,12 +74,9 @@ fi
 usermod -aG docker "$DEPLOY_USER"
 passwd -l "$DEPLOY_USER" >/dev/null 2>&1 || true
 
-install -d -m 0755 "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy" \
-  "$SUB2API_ROOT/dujiao" "$SUB2API_ROOT/bridge" "$SUB2API_ROOT/bridge/config"
-chown root:root "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy" \
-  "$SUB2API_ROOT/dujiao" "$SUB2API_ROOT/bridge" "$SUB2API_ROOT/bridge/config"
-chmod 0755 "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy" \
-  "$SUB2API_ROOT/dujiao" "$SUB2API_ROOT/bridge" "$SUB2API_ROOT/bridge/config"
+install -d -m 0755 "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy"
+chown root:root "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy"
+chmod 0755 "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy"
 install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" \
   "$SUB2API_ROOT/.ssh" \
   "$SUB2API_ROOT/.docker" \
@@ -89,9 +85,9 @@ install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" \
   "$SUB2API_ROOT/state" \
   "$SUB2API_ROOT/releases"
 # Runtime volumes are initialized once. A rerun must not recursively chown
-# PostgreSQL, Redis, or Caddy data back to the deployment account.
-for runtime_dir in data postgres_data redis_data caddy_data caddy_config \
-  bridge_postgres_data dujiao_data dujiao_uploads dujiao_logs dujiao_postgres_data dujiao_redis_data; do
+# PostgreSQL, Redis, or Caddy data back to the deployment account. Legacy
+# Bridge/Dujiao directories are deliberately left untouched for rollback.
+for runtime_dir in data postgres_data redis_data caddy_data caddy_config; do
   if [[ ! -d "$SUB2API_ROOT/$runtime_dir" ]]; then
     install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$SUB2API_ROOT/$runtime_dir"
   fi
@@ -100,10 +96,6 @@ done
 install -m 0644 "$SOURCE_DIR/docker-compose.yml" "$SUB2API_ROOT/compose.yml"
 install -m 0644 "$SOURCE_DIR/Caddyfile" "$SUB2API_ROOT/Caddyfile"
 install -m 0644 "$SOURCE_DIR/.env.example" "$SUB2API_ROOT/.env.example"
-install -m 0600 "$SOURCE_DIR/dujiao/config.yml.example" "$SUB2API_ROOT/dujiao/config.yml.example"
-if [[ ! -f "$SUB2API_ROOT/bridge/config/skus.json" ]]; then
-  install -m 0644 "$SOURCE_DIR/bridge/config/skus.json" "$SUB2API_ROOT/bridge/config/skus.json"
-fi
 for script in "$SOURCE_DIR"/scripts/*.sh; do
   install -m 0755 "$script" "$SUB2API_ROOT/bin/$(basename "$script")"
 done
@@ -149,24 +141,13 @@ ensure_secret() {
 }
 
 set_env PUBLIC_DOMAIN "$PUBLIC_DOMAIN"
-set_env PAYMENT_DOMAIN "$PAYMENT_DOMAIN"
 set_env SERVER_FRONTEND_URL "https://${PUBLIC_DOMAIN}"
 set_env SERVER_TRUSTED_PROXIES "172.30.0.10/32"
 set_env SECURITY_TRUST_FORWARDED_IP_FOR_API_KEY_ACL "false"
-set_env BRIDGE_PUBLIC_URL "https://${PUBLIC_DOMAIN}"
-set_env DUJIAO_BASE_URL "http://dujiao-next:8080"
-set_env DUJIAO_IMAGE "dujiaonext/dujiao-next@sha256:45afd5926c9df3a119caee20259242c107d7ce5e8c36dd40a8a0372c4d9730a5"
 ensure_secret POSTGRES_PASSWORD
 ensure_secret REDIS_PASSWORD
 ensure_secret JWT_SECRET
 ensure_secret TOTP_ENCRYPTION_KEY
-ensure_secret BRIDGE_ADMIN_TOKEN
-ensure_secret BRIDGE_POSTGRES_PASSWORD
-ensure_secret DUJIAO_POSTGRES_PASSWORD
-ensure_secret DUJIAO_REDIS_PASSWORD
-ensure_secret DUJIAO_APP_SECRET
-ensure_secret DUJIAO_JWT_SECRET
-ensure_secret DUJIAO_USER_JWT_SECRET
 
 admin_password=$(env_get ADMIN_PASSWORD)
 if [[ -z "$admin_password" ]]; then
@@ -174,59 +155,19 @@ if [[ -z "$admin_password" ]]; then
   set_env ADMIN_PASSWORD "$admin_password"
   log "Generated ADMIN_PASSWORD"
 fi
-dujiao_admin_password=$(env_get DUJIAO_ADMIN_PASSWORD)
-if [[ -z "$dujiao_admin_password" ]]; then
-  # Dujiao requires upper, lower, and numeric characters by default. A raw
-  # hex secret is lower-case only and makes the service crash-loop at boot.
-  dujiao_admin_password="Xdd1$(openssl rand -hex 23)Aa"
-  set_env DUJIAO_ADMIN_PASSWORD "$dujiao_admin_password"
-  log "Generated DUJIAO_ADMIN_PASSWORD"
-fi
-dujiao_admin_path=$(env_get DUJIAO_ADMIN_PATH)
-if [[ -z "$dujiao_admin_path" ]]; then
-  dujiao_admin_path="/dj-$(openssl rand -hex 8)"
-  set_env DUJIAO_ADMIN_PATH "$dujiao_admin_path"
-  log "Generated DUJIAO_ADMIN_PATH"
-fi
-[[ "$dujiao_admin_path" =~ ^/[A-Za-z0-9._-]+$ ]] || die "DUJIAO_ADMIN_PATH must be one absolute URL path segment"
-dujiao_admin_username=$(env_get DUJIAO_ADMIN_USERNAME)
-[[ -n "$dujiao_admin_username" ]] || die "DUJIAO_ADMIN_USERNAME must not be empty"
-
-# The Dujiao config contains three independent secrets. Render it exactly once;
-# a rerun must never overwrite a live payment configuration.
-dujiao_config="$SUB2API_ROOT/dujiao/config.yml"
-if [[ ! -f "$dujiao_config" ]]; then
-  dujiao_config_tmp=$(mktemp)
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line=${line//__DUJIAO_APP_SECRET__/$(env_get DUJIAO_APP_SECRET)}
-    line=${line//__DUJIAO_JWT_SECRET__/$(env_get DUJIAO_JWT_SECRET)}
-    line=${line//__DUJIAO_USER_JWT_SECRET__/$(env_get DUJIAO_USER_JWT_SECRET)}
-    line=${line//__DUJIAO_POSTGRES_USER__/$(env_get DUJIAO_POSTGRES_USER)}
-    line=${line//__DUJIAO_POSTGRES_PASSWORD__/$(env_get DUJIAO_POSTGRES_PASSWORD)}
-    line=${line//__DUJIAO_POSTGRES_DB__/$(env_get DUJIAO_POSTGRES_DB)}
-    line=${line//__DUJIAO_REDIS_PASSWORD__/$(env_get DUJIAO_REDIS_PASSWORD)}
-    line=${line//__DUJIAO_ADMIN_PATH__/$dujiao_admin_path}
-    printf '%s\n' "$line"
-  done < "$SUB2API_ROOT/dujiao/config.yml.example" > "$dujiao_config_tmp"
-  install -m 0600 -o root -g root "$dujiao_config_tmp" "$dujiao_config"
-  rm -f "$dujiao_config_tmp"
-  log "Rendered ${dujiao_config}"
-else
-  log "Keeping existing ${dujiao_config}"
-fi
-
 admin_email=$(env_get ADMIN_EMAIL)
 credentials_file="/root/xddapi-initial-credentials.txt"
-(
-  umask 077
-  printf 'SUB2API_ADMIN_EMAIL=%s\n' "$admin_email"
-  printf 'SUB2API_ADMIN_PASSWORD=%s\n' "$admin_password"
-  printf 'DUJIAO_ADMIN_URL=https://%s%s\n' "$PAYMENT_DOMAIN" "$dujiao_admin_path"
-  printf 'DUJIAO_ADMIN_USERNAME=%s\n' "$dujiao_admin_username"
-  printf 'DUJIAO_ADMIN_PASSWORD=%s\n' "$dujiao_admin_password"
-  printf 'BRIDGE_ADMIN_TOKEN=%s\n' "$(env_get BRIDGE_ADMIN_TOKEN)"
-) > "$credentials_file"
-chmod 0600 "$credentials_file"
+if [[ ! -e "$credentials_file" ]]; then
+  (
+    umask 077
+    printf 'SUB2API_ADMIN_EMAIL=%s\n' "$admin_email"
+    printf 'SUB2API_ADMIN_PASSWORD=%s\n' "$admin_password"
+  ) > "$credentials_file"
+  chmod 0600 "$credentials_file"
+  log "Wrote first-bootstrap administrator credentials to ${credentials_file}"
+else
+  log "Keeping existing ${credentials_file}; bootstrap never overwrites credentials"
+fi
 
 if [[ -n "${DEPLOY_PUBLIC_KEY:-}" ]]; then
   [[ "$DEPLOY_PUBLIC_KEY" != *$'\n'* && "$DEPLOY_PUBLIC_KEY" != *$'\r'* ]] || die "DEPLOY_PUBLIC_KEY must be exactly one line"
@@ -317,8 +258,6 @@ if [[ -s "$SUB2API_ROOT/caddy/origin.pem" && -s "$SUB2API_ROOT/caddy/origin.key"
   [[ "$cert_pub" == "$key_pub" ]] || die "Cloudflare Origin CA certificate and private key do not match"
   openssl x509 -in "$SUB2API_ROOT/caddy/origin.pem" -noout -checkhost "$PUBLIC_DOMAIN" >/dev/null \
     || die "Cloudflare Origin CA certificate does not cover ${PUBLIC_DOMAIN}"
-  openssl x509 -in "$SUB2API_ROOT/caddy/origin.pem" -noout -checkhost "$PAYMENT_DOMAIN" >/dev/null \
-    || die "Cloudflare Origin CA certificate does not cover ${PAYMENT_DOMAIN}; recreate it with both hostnames"
   chmod 0644 "$SUB2API_ROOT/caddy/origin.pem"
   chmod 0600 "$SUB2API_ROOT/caddy/origin.key"
 fi
@@ -391,4 +330,5 @@ fi
 
 log "Bootstrap complete"
 log "Initial admin credentials: ${credentials_file} (delete after saving)"
-log "Next: configure the Dujiao channel in its admin panel, then fill DUJIAO_CHANNEL_KEY/SECRET and SUB2API_ADMIN_API_KEY in .env"
+log "Next: sign in to Sub2API and configure a native payment provider under Settings > Payment"
+log "Legacy Bridge/Dujiao containers and data are not modified by bootstrap"

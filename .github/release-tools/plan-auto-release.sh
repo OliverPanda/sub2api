@@ -33,7 +33,7 @@ changed=$(git diff --name-only "${latest_tag}..HEAD")
 app_changed=false
 while IFS= read -r path; do
   case "$path" in
-    backend/*|frontend/*|bridge/*|Dockerfile.goreleaser|deploy/docker-entrypoint.sh|.goreleaser.yaml|.goreleaser.simple.yaml)
+    backend/*|frontend/*|Dockerfile.goreleaser|deploy/docker-entrypoint.sh|.goreleaser.yaml|.goreleaser.simple.yaml)
       app_changed=true
       break
       ;;

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -19,12 +20,37 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// Decimal is a display-only JSON decimal. Sub2API stores balances with more
+// than two decimal places, so they cannot be decoded into money.Cents.
+type Decimal string
+
+func (d *Decimal) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		*d = ""
+		return nil
+	}
+	value := string(raw)
+	if raw[0] == '"' {
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("invalid decimal string: %w", err)
+		}
+	}
+	if _, ok := new(big.Rat).SetString(value); !ok {
+		return fmt.Errorf("invalid decimal %q", value)
+	}
+	*d = Decimal(value)
+	return nil
+}
+
+func (d Decimal) String() string { return string(d) }
+
 type User struct {
-	ID       int64       `json:"id"`
-	Email    string      `json:"email"`
-	Username string      `json:"username"`
-	Role     string      `json:"role"`
-	Balance  money.Cents `json:"balance"`
+	ID       int64   `json:"id"`
+	Email    string  `json:"email"`
+	Username string  `json:"username"`
+	Role     string  `json:"role"`
+	Balance  Decimal `json:"balance"`
 }
 
 type APIError struct {

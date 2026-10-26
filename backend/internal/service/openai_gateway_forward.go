@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -819,11 +820,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				)
 				return false
 			}
-			if HasFunctionCallOutput(wsReqBody) {
+			replayBody, marshalErr := json.Marshal(wsReqBody)
+			if marshalErr != nil || !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(replayBody) {
 				logOpenAIWSModeInfo(
-					"reconnect_prev_response_recovery_skip account_id=%d attempt=%d reason=has_function_call_output previous_response_id_present=true",
+					"reconnect_prev_response_recovery_skip account_id=%d attempt=%d reason=incomplete_replay_context previous_response_id_present=true has_function_call_output=%v",
 					account.ID,
 					attempt,
+					HasFunctionCallOutput(wsReqBody),
 				)
 				return false
 			}
@@ -863,8 +866,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			}
 			previousResponseID := openAIWSPayloadString(wsReqBody, "previous_response_id")
 			hasFunctionCallOutput := HasFunctionCallOutput(wsReqBody)
+			droppedPreviousResponseID := false
 			if previousResponseID != "" && !hasFunctionCallOutput {
-				delete(wsReqBody, "previous_response_id")
+				replayBody, marshalErr := json.Marshal(wsReqBody)
+				if marshalErr == nil && CanReplayOpenAIResponsesInputWithoutPreviousResponseID(replayBody) {
+					delete(wsReqBody, "previous_response_id")
+					droppedPreviousResponseID = true
+				}
 			}
 			wsInvalidEncryptedContentRecoveryTried = true
 			logOpenAIWSModeInfo(
@@ -875,7 +883,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				truncateOpenAIWSLogValue(previousResponseID, openAIWSIDValueMaxLen),
 				normalizeOpenAIWSLogValue(ClassifyOpenAIPreviousResponseIDKind(previousResponseID)),
 				hasFunctionCallOutput,
-				previousResponseID != "" && !hasFunctionCallOutput,
+				droppedPreviousResponseID,
 			)
 			return true
 		}

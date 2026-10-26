@@ -143,6 +143,7 @@ docs/*
 !docs/COMPOSITE_GROUPS.md
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/channel-monitor-v2-safe-defaults.md
+!docs/OPS_STRATEGY_CN.md
 !docs/DUJIAO_SUB2API_BRIDGE_CN.md
 !docs/PAYMENT_INTERACTION_CN.md
 !docs/PAYMENT_HK_CN.md

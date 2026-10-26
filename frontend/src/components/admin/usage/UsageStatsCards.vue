@@ -76,6 +76,16 @@
             {{ t('usage.standardCost') }}
             <span :class="{ 'line-through': strikeStandardCost }">${{ (stats?.total_cost || 0).toFixed(4) }}</span>
           </span>
+          <template v-if="showAccountCost && totalAccountCost != null">
+            <span> · </span>
+            <span
+              class="cursor-help border-b border-dotted"
+              :class="profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'"
+              :title="t('usage.profitHint')"
+            >
+              {{ t('usage.profit') }} ${{ profit.toFixed(4) }}
+            </span>
+          </template>
         </p>
       </div>
     </div>
@@ -111,6 +121,7 @@ const totalAccountCost = computed(() => {
   return stats?.total_account_cost ?? null
 })
 const showAccountCost = computed(() => props.showAccountCost)
+const profit = computed(() => (props.stats?.total_actual_cost || 0) - (totalAccountCost.value ?? 0))
 const strikeStandardCost = computed(() => props.strikeStandardCost)
 
 const formatDuration = (ms: number) =>

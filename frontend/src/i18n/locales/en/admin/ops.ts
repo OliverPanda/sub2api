@@ -142,6 +142,33 @@ export default {
       errorTrend: 'Error Trend',
       errorDistribution: 'Error Distribution',
       switchRate: 'Avg switches',
+      groupQuality: {
+        title: 'Group Quality Ranking',
+        description: 'Uses groups with at least {sample} SLA samples; low-sample groups are ranked last to avoid false alarms.',
+        insufficient: 'Low samples: {count}',
+        refresh: 'Refresh',
+        retry: 'Retry',
+        empty: 'No group quality data in this time window',
+        selectHint: 'Click to inspect this group’s requests and errors',
+        showAll: 'Show all {count} groups',
+        showTop: 'Collapse to top 10',
+        failedToLoad: 'Failed to load group quality ranking',
+        columns: {
+          group: 'Group',
+          requests: 'Requests',
+          samples: 'SLA samples',
+          successRate: 'Success rate',
+          upstreamErrorRate: 'Upstream error rate',
+          rateLimitRate: '429 rate',
+          p95Duration: 'P95 duration',
+          p95TTFT: 'P95 TTFT',
+          status: 'Status'
+        },
+        status: {
+          measured: 'Measured',
+          insufficient: 'Low sample'
+        }
+      },
       // Health Score & Diagnosis
       health: 'Health',
       healthCondition: 'Health Condition',
@@ -809,6 +836,7 @@ export default {
         outputTps: 'Percentiles of each valid usage record’s output tokens / total duration, including first-token wait, within the selected time, platform and group. Output may include reasoning tokens; they are not added again. P50 is the median; P5/P10 show slower requests. Higher is faster. Excludes images, Live and records without positive output or duration. Samples come from retained usage logs; — means no samples or temporarily unavailable statistics.',
         totalRequests: 'Total number of requests (including both successful and failed requests) in the selected time window.',
         throughputTrend: 'Requests/QPS + Tokens/TPS in the selected window.',
+        groupQuality: 'Per-group success rate, upstream error rate, 429 rate, and P95 latency. Success rate = successes / (successes + non-business-limited client-visible errors); upstream errors exclude 429/529; business limits and count_tokens requests are excluded from SLA samples.',
         switchRateTrend: 'Trend of account switches / total requests over the last 5 hours (avg switches).',
         latencyHistogram: 'Request duration distribution (ms) for successful requests.',
         errorTrend: 'Error counts over time (SLA scope excludes business limits; upstream excludes 429/529).',

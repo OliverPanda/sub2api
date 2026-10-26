@@ -29,6 +29,10 @@
             }}
           </p>
           <p>{{ t('admin.accounts.upstreamBilling.effectiveRate', { value: currentEffectiveRate ?? '-' }) }}</p>
+          <p v-if="balanceValue != null">{{ t('admin.accounts.upstreamBilling.walletBalance', { value: `$${balanceValue.toFixed(2)}` }) }}</p>
+          <p v-if="quotaValue != null">
+            {{ t('admin.accounts.upstreamBilling.keyQuota', { value: `$${quotaValue.toFixed(2)}`, used: `$${(quotaUsedValue ?? 0).toFixed(2)}` }) }}
+          </p>
           <p>{{ t('admin.accounts.upstreamBilling.updatedAt', { value: formatDate(snapshot?.received_at) }) }}</p>
         </template>
         <template v-else-if="stale && lastDetectedRate != null">
@@ -173,6 +177,18 @@ const currentEffectiveRate = computed(() => {
   if (start == null || end == null || minute == null || start >= end || typeof peak !== 'number' || !Number.isFinite(peak) || peak < 0) return null
   const value = minute >= start && minute < end ? base * peak : base
   return Number.isFinite(value) ? value : null
+})
+const balanceValue = computed(() => {
+  const value = data.value?.balance
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+})
+const quotaValue = computed(() => {
+  const value = data.value?.quota
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+})
+const quotaUsedValue = computed(() => {
+  const value = data.value?.quota_used
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
 })
 const lastDetectedRate = computed(() => {
   const value = data.value?.effective_rate_multiplier

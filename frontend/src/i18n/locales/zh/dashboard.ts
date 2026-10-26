@@ -354,6 +354,8 @@ export default {
     standardCost: '标准',
     actualCost: '实际',
     accountCost: '成本',
+    profit: '利润',
+    profitHint: '利润 = 实际消费 − 账号成本（推算口径，实际充值支出以线下账单为准）',
     userBilled: '用户扣费',
     accountBilled: '账号计费',
     resetNow: '现在',

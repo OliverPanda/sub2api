@@ -412,6 +412,11 @@ func normalizeOpenAIWSContextWindowBoundary(
 		return payload, boundary, nil
 	}
 	boundary.Changed = true
+	if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(payload) {
+		// 新上下文窗口切换也不能成为静默丢历史的例外。无法证明 input 自包含时
+		// 保留锚点，让上游返回可诊断的错误。
+		return payload, boundary, nil
+	}
 	updated, removed, err := dropPreviousResponseIDFromRawPayload(payload)
 	if err != nil {
 		return payload, boundary, err
@@ -760,6 +765,13 @@ func buildOpenAIWSReplayInputSequenceFromItems(
 	if openAIWSRawItemsHasPrefix(currentItems, previousFullInput) {
 		return currentItems, true
 	}
+	// 客户端在 store=false 模式下经常把完整会话历史随当前 turn 一起重发。
+	// 此时当前 input 已经具备无锚点重放条件，不能再叠加 previousFullInput，
+	// 否则会把上一轮内容重复插入，既浪费上下文也可能改变模型语义。
+	// 仅有增量（例如单个 input_text / 单条 user）时不满足该证明，继续走合并路径。
+	if CanReplayOpenAIResponsesInputItemsWithoutPreviousResponseID(currentItems) {
+		return currentItems, true
+	}
 	merged := make([]json.RawMessage, 0, len(previousFullInput)+len(currentItems))
 	merged = append(merged, previousFullInput...)
 	merged = append(merged, currentItems...)
@@ -819,16 +831,15 @@ func buildOpenAIWSCurrentTurnRetryPayload(
 	if err != nil {
 		return nil, false, err
 	}
+	if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(retryPayload) {
+		return nil, false, nil
+	}
 	retryPayload = RemovePreviousResponseIDFromBody(retryPayload)
 	if model := strings.TrimSpace(originalModel); model != "" {
 		retryPayload, err = sjson.SetBytes(retryPayload, "model", model)
 		if err != nil {
 			return nil, false, err
 		}
-	}
-	coverage := AnalyzeToolCallOutputContextCoverageBytes(retryPayload)
-	if coverage.HasFunctionCallOutput && !coverage.ContextCoversAllCallIDs {
-		return nil, false, nil
 	}
 	return retryPayload, true, nil
 }

@@ -39,4 +39,3 @@ wait_one() {
 }
 
 wait_one sub2api
-wait_one bridge

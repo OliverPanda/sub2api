@@ -370,7 +370,22 @@ export default {
         noEligibleAccounts: 'Select API key accounts',
         batchLimit: 'A batch can probe at most 20 accounts',
         batchCompleted: 'Probed {count} account(s)',
-        batchPartial: 'Probe partially completed: {success} succeeded, {failed} failed'
+        batchPartial: 'Probe partially completed: {success} succeeded, {failed} failed',
+        walletBalance: 'Wallet balance: {value}',
+        keyQuota: 'Key quota: {value} (used {used})'
+      },
+      upstreamBalances: {
+        title: 'Upstream balances',
+        total: 'Total upstream balance (A+B+C)',
+        refresh: 'Refresh balances',
+        refreshing: 'Refreshing...',
+        loadFailed: 'Failed to load upstream balances',
+        noData: 'No balance data yet; enable automatic probing and wait for a successful probe.',
+        staleHint: 'Balances are stale for the following accounts:',
+        probeFailedHint: '{count} account(s) last probed unsuccessfully; their balances are excluded from the total.',
+        partialHint: 'Some accounts did not report a balance; the total includes probed accounts only.',
+        receivedAt: 'Updated: {value}',
+        unknown: 'Unknown'
       },
       allPrivacyModes: 'All Privacy States',
       privacyUnset: 'Unset',

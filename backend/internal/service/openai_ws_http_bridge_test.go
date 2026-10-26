@@ -32,17 +32,23 @@ func TestResolveOpenAIWSClientFirstMessageTimeout(t *testing.T) {
 }
 
 func TestPrepareOpenAIWSHTTPBridgeBodyStripsWSFields(t *testing.T) {
-	body, err := prepareOpenAIWSHTTPBridgeBody(nil, []byte(`{"type":"response.create","generate":true,"model":"gpt-5","stream":false,"previous_response_id":"resp_prev","input":"hi","sequence":900719925474099312345}`))
+	body, err := prepareOpenAIWSHTTPBridgeBody(nil, []byte(`{"type":"response.create","generate":true,"model":"gpt-5","stream":false,"previous_response_id":"resp_prev","input":[{"role":"user","content":"hi"},{"type":"message","role":"assistant","content":"hello"},{"role":"user","content":"continue"}],"sequence":900719925474099312345}`))
 	require.NoError(t, err)
 	require.False(t, gjson.GetBytes(body, "type").Exists())
 	require.False(t, gjson.GetBytes(body, "generate").Exists())
 	require.False(t, gjson.GetBytes(body, "previous_response_id").Exists())
 	require.Equal(t, "gpt-5", gjson.GetBytes(body, "model").String())
 	require.True(t, gjson.GetBytes(body, "stream").Bool())
-	require.Equal(t, "hi", gjson.GetBytes(body, "input").String())
+	require.Len(t, gjson.GetBytes(body, "input").Array(), 3)
 	require.Equal(t, "900719925474099312345", gjson.GetBytes(body, "sequence").Raw)
 	_, err = prepareOpenAIWSHTTPBridgeBody(nil, []byte(`{"type":"response.create"}{"trailing":true}`))
 	require.Error(t, err)
+}
+
+func TestPrepareOpenAIWSHTTPBridgeBodyRejectsIncompleteContinuation(t *testing.T) {
+	_, err := prepareOpenAIWSHTTPBridgeBody(nil, []byte(`{"type":"response.create","model":"gpt-5","previous_response_id":"resp_prev","input":"continue"}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "complete replay input")
 }
 
 func TestPrepareOpenAIWSHTTPBridgeBodyStripsNoneReasoningForCompatibleEndpoint(t *testing.T) {
@@ -517,7 +523,7 @@ func TestOpenAIWSHTTPBridgeFullCustomToolHistoryWithoutPreviousResponseIDDoesNot
 		return "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"" + responseID + "\",\"model\":\"gpt-5.1\",\"output\":" + output + ",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n"
 	}
 	upstream := &httpUpstreamRecorder{responses: []*http.Response{
-		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completed("resp_1", `[{"type":"custom_tool_call","id":"item_1","call_id":"call_1","name":"exec","input":"pwd"}]`)))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completed("resp_1", `[{"type":"custom_tool_call","id":"item_1","call_id":"call_1","name":"exec","input":"pwd"},{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"ran pwd"}]}]`)))},
 		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completed("resp_2", `[]`)))},
 		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completed("resp_3", `[]`)))},
 		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completed("resp_4", `[]`)))},
@@ -578,6 +584,13 @@ func TestOpenAIWSHTTPBridgeFullCustomToolHistoryWithoutPreviousResponseIDDoesNot
 		readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
 		_, event, readErr := clientConn.Read(readCtx)
 		cancelRead()
+		if readErr != nil {
+			select {
+			case proxyErr := <-errCh:
+				t.Fatalf("read bridge event: %v; proxy error: %v", readErr, proxyErr)
+			default:
+			}
+		}
 		require.NoError(t, readErr)
 		require.Equal(t, "response.completed", gjson.GetBytes(event, "type").String())
 	}
@@ -598,9 +611,10 @@ func TestOpenAIWSHTTPBridgeFullCustomToolHistoryWithoutPreviousResponseIDDoesNot
 
 	require.Len(t, upstream.bodies, 4)
 	orphanInput := gjson.GetBytes(upstream.bodies[1], "input").Array()
-	require.Len(t, orphanInput, 2)
+	require.Len(t, orphanInput, 3)
 	require.Equal(t, "run pwd", orphanInput[0].String())
-	require.Equal(t, "user", orphanInput[1].Get("role").String())
+	require.Equal(t, "assistant", orphanInput[1].Get("role").String())
+	require.Equal(t, "user", orphanInput[2].Get("role").String())
 	for _, body := range upstream.bodies[2:] {
 		input := gjson.GetBytes(body, "input").Array()
 		require.Len(t, input, 3)
@@ -1754,7 +1768,7 @@ func TestProxyResponsesWebSocketFromClientForGrokUsesXAIHTTPBridgeAndPreservesMa
 			"",
 			`data: {"type":"response.output_text.delta","response":{"id":"` + responseID + `"},"delta":"ok"}`,
 			"",
-			`data: {"type":"response.completed","response":{"id":"` + responseID + `","model":"grok-4.3","usage":{"input_tokens":4,"output_tokens":2,"input_tokens_details":{"cached_tokens":` + fmt.Sprintf("%d", cachedTokens) + `}}}}`,
+			`data: {"type":"response.completed","response":{"id":"` + responseID + `","model":"grok-4.3","output":[{"type":"message","id":"msg_` + responseID + `","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":4,"output_tokens":2,"input_tokens_details":{"cached_tokens":` + fmt.Sprintf("%d", cachedTokens) + `}}}}`,
 			"",
 		}, "\n")
 		return &http.Response{

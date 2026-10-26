@@ -24,6 +24,17 @@ func TestNormalizeOpenAIResponsesLegacyIngressMessagesOnly(t *testing.T) {
 	require.Equal(t, gjson.False, gjson.GetBytes(normalized, "stream").Type)
 }
 
+func TestNormalizeOpenAIResponsesLegacyIngressKeepsAnchorWithoutFullHistory(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"continue from history"}],"previous_response_id":"resp_keep"}`)
+
+	normalized, changed, err := normalizeOpenAIResponsesLegacyIngress(body)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.False(t, gjson.GetBytes(normalized, "messages").Exists())
+	require.Equal(t, "resp_keep", gjson.GetBytes(normalized, "previous_response_id").String())
+	require.Equal(t, "continue from history", gjson.GetBytes(normalized, "input.0.content").String())
+}
+
 func TestNormalizeOpenAIResponsesLegacyIngressConvertsChatTopLevelFields(t *testing.T) {
 	body := []byte(`{"model":"gpt-4.1","messages":[{"role":"user","content":"weather?"}],"tools":[{"type":"function","function":{"name":"lookup","description":"Lookup weather","parameters":{"type":"object"}}}],"tool_choice":{"type":"function","function":{"name":"lookup"}},"max_tokens":64,"reasoning_effort":"high","service_tier":"flex","temperature":0.2,"top_p":0.7}`)
 

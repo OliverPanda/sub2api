@@ -93,6 +93,10 @@ func (m *opsRepoMock) GetThroughputTrend(ctx context.Context, filter *OpsDashboa
 	return &OpsThroughputTrendResponse{}, nil
 }
 
+func (m *opsRepoMock) GetGroupQualityRanking(ctx context.Context, filter *OpsDashboardFilter, minSample int) (*OpsGroupQualityResponse, error) {
+	return &OpsGroupQualityResponse{MinSample: minSample, Items: []*OpsGroupQualityItem{}}, nil
+}
+
 func (m *opsRepoMock) GetLatencyHistogram(ctx context.Context, filter *OpsDashboardFilter) (*OpsLatencyHistogramResponse, error) {
 	return &OpsLatencyHistogramResponse{}, nil
 }

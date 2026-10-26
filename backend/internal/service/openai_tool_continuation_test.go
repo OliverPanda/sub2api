@@ -298,3 +298,157 @@ func TestAnalyzeToolCallOutputContextCoverageBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestAnalyzeOpenAIReplayContextBytesStrictSafetyProof(t *testing.T) {
+	cases := []struct {
+		name             string
+		body             map[string]any
+		safeToDrop       bool
+		hasInputArray    bool
+		hasUser          bool
+		hasAssistant     bool
+		hasToolOutput    bool
+		toolFullyCovered bool
+	}{
+		{
+			name:          "empty body",
+			body:          nil,
+			safeToDrop:    false,
+			hasInputArray: false,
+		},
+		{
+			name:          "input string cannot replay prior context",
+			body:          map[string]any{"input": "hello"},
+			safeToDrop:    false,
+			hasInputArray: false,
+		},
+		{
+			name:          "empty input array",
+			body:          map[string]any{"input": []any{}},
+			safeToDrop:    false,
+			hasInputArray: true,
+		},
+		{
+			name: "last user message only",
+			body: map[string]any{"input": []any{
+				map[string]any{"role": "user", "content": "continue"},
+			}},
+			safeToDrop:    false,
+			hasInputArray: true,
+			hasUser:       true,
+		},
+		{
+			name: "assistant history without user",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "message", "role": "assistant", "content": "old answer"},
+			}},
+			safeToDrop:    false,
+			hasInputArray: true,
+			hasAssistant:  true,
+		},
+		{
+			name: "user and assistant history can replay",
+			body: map[string]any{"input": []any{
+				map[string]any{"role": "user", "content": "first"},
+				map[string]any{"type": "message", "role": "assistant", "content": "answer"},
+				map[string]any{"role": "user", "content": "continue"},
+			}},
+			safeToDrop:    true,
+			hasInputArray: true,
+			hasUser:       true,
+			hasAssistant:  true,
+		},
+		{
+			name: "string user item and assistant history can replay",
+			body: map[string]any{"input": []any{
+				"first",
+				map[string]any{"type": "message", "role": "assistant", "content": "answer"},
+				"continue",
+			}},
+			safeToDrop:    true,
+			hasInputArray: true,
+			hasUser:       true,
+			hasAssistant:  true,
+		},
+		{
+			name: "complete tool chain can replay",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call", "call_id": "call_a", "name": "read", "arguments": "{}"},
+				map[string]any{"type": "function_call_output", "call_id": "call_a", "output": "done"},
+			}},
+			safeToDrop:       true,
+			hasInputArray:    true,
+			hasToolOutput:    true,
+			toolFullyCovered: true,
+		},
+		{
+			name: "partial tool chain cannot replay",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call", "call_id": "call_a", "name": "read", "arguments": "{}"},
+				map[string]any{"type": "function_call_output", "call_id": "call_a", "output": "done"},
+				map[string]any{"type": "function_call_output", "call_id": "call_b", "output": "missing context"},
+			}},
+			safeToDrop:       false,
+			hasInputArray:    true,
+			hasToolOutput:    true,
+			toolFullyCovered: false,
+		},
+		{
+			name: "tool output missing call id cannot replay",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call", "call_id": "call_a", "name": "read", "arguments": "{}"},
+				map[string]any{"type": "function_call_output", "output": "done"},
+			}},
+			safeToDrop:       false,
+			hasInputArray:    true,
+			hasToolOutput:    true,
+			toolFullyCovered: false,
+		},
+		{
+			name: "tool chain covered by item reference can replay",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call_output", "call_id": "call_a", "output": "done"},
+				map[string]any{"type": "item_reference", "id": "call_a"},
+			}},
+			safeToDrop:       true,
+			hasInputArray:    true,
+			hasToolOutput:    true,
+			toolFullyCovered: true,
+		},
+		{
+			name: "conversation history does not cover tool output",
+			body: map[string]any{"input": []any{
+				map[string]any{"role": "user", "content": "first"},
+				map[string]any{"role": "assistant", "content": "answer"},
+				map[string]any{"type": "function_call_output", "call_id": "call_a", "output": "done"},
+			}},
+			safeToDrop:       false,
+			hasInputArray:    true,
+			hasUser:          true,
+			hasAssistant:     true,
+			hasToolOutput:    true,
+			toolFullyCovered: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			var body []byte
+			var err error
+			if tt.body != nil {
+				body, err = json.Marshal(tt.body)
+				require.NoError(t, err)
+			}
+			proof := AnalyzeOpenAIReplayContextBytes(body)
+			require.Equal(t, tt.safeToDrop, proof.SafeToDropPreviousResponseID)
+			require.Equal(t, tt.hasInputArray, proof.HasInputArray)
+			require.Equal(t, tt.hasUser, proof.HasUserMessage)
+			require.Equal(t, tt.hasAssistant, proof.HasAssistantMessage)
+			require.Equal(t, tt.hasToolOutput, proof.HasFunctionCallOutput)
+			require.Equal(t, tt.toolFullyCovered, proof.ToolOutputsFullyCovered)
+		})
+	}
+
+	require.False(t, CanReplayOpenAIResponsesInputWithoutPreviousResponseID([]byte(`{"input":[`)))
+	require.False(t, CanReplayOpenAIResponsesInputItemsWithoutPreviousResponseID(nil))
+}

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -224,6 +225,140 @@ type ToolCallOutputContextCoverage struct {
 	// 任一输出无法由 input 自身重建时为 false，此时剥离 previous_response_id 会导致
 	// 上游以 "No tool call found for function call output" 拒绝请求。
 	ContextCoversAllCallIDs bool
+}
+
+// OpenAIReplayContextProof 描述不含 previous_response_id 的 input 能否独立重建上下文。
+// 这是“允许删除续链锚点”的安全证明，不能把 input 中“存在某条历史”误当成
+// “包含完整历史”。证明不足时必须保留 previous_response_id，宁可让上游明确报错，
+// 也不能静默降级成只发送当前一条消息。
+type OpenAIReplayContextProof struct {
+	HasInputArray                bool
+	HasUserMessage               bool
+	HasAssistantMessage          bool
+	HasAssistantOutput           bool
+	HasFunctionCallOutput        bool
+	ToolOutputsFullyCovered      bool
+	SafeToDropPreviousResponseID bool
+}
+
+// AnalyzeOpenAIReplayContextBytes 单次扫描 input，判断请求是否具备完整的无锚点重放条件。
+// 普通对话要求至少包含 user 和 assistant 两条历史；工具续链要求所有输出都能由
+// input 内的同 call_id 工具调用或 item_reference 覆盖。
+func AnalyzeOpenAIReplayContextBytes(body []byte) OpenAIReplayContextProof {
+	proof := OpenAIReplayContextProof{}
+	if len(body) == 0 {
+		return proof
+	}
+	input := parseRawJSONView(body).Get("input")
+	if !input.IsArray() {
+		return proof
+	}
+	proof.HasInputArray = true
+
+	missingCallID := false
+	var outputCallIDs map[string]struct{}
+	var contextCallIDs map[string]struct{}
+	analyzeItem := func(item gjson.Result) {
+		// Responses input 数组允许直接使用字符串，它表示用户输入。若忽略这类
+		// 项，客户端把完整历史序列化成 ["first", assistant, "continue"] 时会
+		// 被安全门误判为缺少 user 历史。
+		if item.Type == gjson.String {
+			if strings.TrimSpace(item.String()) != "" {
+				proof.HasUserMessage = true
+			}
+			return
+		}
+		if !item.IsObject() {
+			return
+		}
+		itemType := strings.TrimSpace(item.Get("type").String())
+		switch {
+		case isCodexToolCallOutputItemType(itemType):
+			proof.HasFunctionCallOutput = true
+			callID := strings.TrimSpace(item.Get("call_id").String())
+			if callID == "" {
+				missingCallID = true
+				return
+			}
+			if outputCallIDs == nil {
+				outputCallIDs = make(map[string]struct{})
+			}
+			outputCallIDs[callID] = struct{}{}
+		case isCodexToolCallContextItemType(itemType):
+			// 工具调用也是模型生成的 assistant 输出；只识别 role=assistant 的
+			// message 会把合法工具续链误判为缺少历史。
+			proof.HasAssistantOutput = true
+			callID := strings.TrimSpace(item.Get("call_id").String())
+			if callID == "" {
+				return
+			}
+			if contextCallIDs == nil {
+				contextCallIDs = make(map[string]struct{})
+			}
+			contextCallIDs[callID] = struct{}{}
+		case itemType == "item_reference":
+			idValue := strings.TrimSpace(item.Get("id").String())
+			if idValue == "" {
+				return
+			}
+			if contextCallIDs == nil {
+				contextCallIDs = make(map[string]struct{})
+			}
+			contextCallIDs[idValue] = struct{}{}
+		}
+		if itemType == "" || itemType == "message" {
+			switch strings.TrimSpace(item.Get("role").String()) {
+			case "user":
+				proof.HasUserMessage = true
+			case "assistant":
+				proof.HasAssistantMessage = true
+			}
+		}
+	}
+	input.ForEach(func(_, item gjson.Result) bool {
+		analyzeItem(item)
+		return true
+	})
+
+	if proof.HasFunctionCallOutput {
+		proof.ToolOutputsFullyCovered = !missingCallID && len(outputCallIDs) > 0
+		if proof.ToolOutputsFullyCovered {
+			for callID := range outputCallIDs {
+				if _, ok := contextCallIDs[callID]; !ok {
+					proof.ToolOutputsFullyCovered = false
+					break
+				}
+			}
+		}
+		proof.SafeToDropPreviousResponseID = proof.ToolOutputsFullyCovered
+		return proof
+	}
+	proof.SafeToDropPreviousResponseID = proof.HasUserMessage &&
+		(proof.HasAssistantMessage || proof.HasAssistantOutput)
+	return proof
+}
+
+// CanReplayOpenAIResponsesInputWithoutPreviousResponseID 是删除
+// previous_response_id 前的严格安全门。任何无法证明完整上下文的请求都必须返回 false。
+func CanReplayOpenAIResponsesInputWithoutPreviousResponseID(body []byte) bool {
+	return AnalyzeOpenAIReplayContextBytes(body).SafeToDropPreviousResponseID
+}
+
+// CanReplayOpenAIResponsesInputItemsWithoutPreviousResponseID 供已拆分的 replay 序列复用
+// 同一安全判定。该函数位于恢复/故障路径，允许一次序列化以换取单一判定语义。
+func CanReplayOpenAIResponsesInputItemsWithoutPreviousResponseID(items []json.RawMessage) bool {
+	if len(items) == 0 {
+		return false
+	}
+	rawItems, err := json.Marshal(items)
+	if err != nil {
+		return false
+	}
+	body := make([]byte, 0, len(rawItems)+10)
+	body = append(body, `{"input":`...)
+	body = append(body, rawItems...)
+	body = append(body, '}')
+	return CanReplayOpenAIResponsesInputWithoutPreviousResponseID(body)
 }
 
 // AnalyzeToolCallOutputContextCoverageBytes 全量扫描 input，按 call_id 精确匹配工具输出

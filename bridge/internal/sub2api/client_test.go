@@ -15,14 +15,14 @@ func TestVerifyUser(t *testing.T) {
 		if r.URL.Path != "/api/v1/auth/me" || r.Header.Get("Authorization") != "Bearer user-token" {
 			t.Fatalf("unexpected request: %s %s", r.URL.Path, r.Header.Get("Authorization"))
 		}
-		_, _ = w.Write([]byte(`{"code":0,"message":"success","data":{"id":7,"email":"u@example.com","balance":12.5}}`))
+		_, _ = w.Write([]byte(`{"code":0,"message":"success","data":{"id":7,"email":"u@example.com","balance":99.9463966}}`))
 	}))
 	defer server.Close()
 	user, err := New(server.URL, "admin-key", server.Client()).VerifyUser(context.Background(), "user-token")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.ID != 7 || user.Balance.Int64() != 1250 {
+	if user.ID != 7 || user.Balance.String() != "99.9463966" {
 		t.Fatalf("unexpected user: %+v", user)
 	}
 }

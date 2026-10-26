@@ -173,6 +173,11 @@ type upstreamBillingProbeResponse struct {
 	EffectiveRateMultiplier *float64 `json:"effective_rate_multiplier"`
 	Timezone                *string  `json:"timezone"`
 	ObservedAt              string   `json:"observed_at"`
+	// Optional wallet / key-quota figures. Older upstreams omit them; schema
+	// checks stay unchanged so the probe never rejects a valid rate snapshot.
+	Balance   *float64 `json:"balance"`
+	Quota     *float64 `json:"quota"`
+	QuotaUsed *float64 `json:"quota_used"`
 }
 
 // GetUpstreamBillingProbeSettings returns defaults when the setting is absent.
@@ -850,6 +855,15 @@ func parseUpstreamBillingProbeResponse(body []byte) (map[string]any, error) {
 	if response.UserRateMultiplier != nil {
 		data["user_rate_multiplier"] = *response.UserRateMultiplier
 	}
+	if response.Balance != nil && *response.Balance >= 0 && !math.IsNaN(*response.Balance) && !math.IsInf(*response.Balance, 0) {
+		data["balance"] = *response.Balance
+	}
+	if response.Quota != nil && *response.Quota >= 0 && !math.IsNaN(*response.Quota) && !math.IsInf(*response.Quota, 0) {
+		data["quota"] = *response.Quota
+	}
+	if response.QuotaUsed != nil && *response.QuotaUsed >= 0 && !math.IsNaN(*response.QuotaUsed) && !math.IsInf(*response.QuotaUsed, 0) {
+		data["quota_used"] = *response.QuotaUsed
+	}
 	if *response.PeakRateEnabled {
 		if response.PeakStart == nil || response.PeakEnd == nil || response.Timezone == nil ||
 			response.PeakRateMultiplier == nil || response.AppliedPeakMultiplier == nil ||
@@ -1176,4 +1190,11 @@ func safeProbeError(err error) string {
 		return ErrUpstreamBillingProbeUnavailable.Error()
 	}
 	return "probe_failed"
+}
+
+// DecodeUpstreamBillingProbeSnapshotPublic is the exported wrapper around
+// decodeUpstreamBillingProbeSnapshot for admin handlers that need the
+// persisted probe snapshot without depending on the internal field name.
+func DecodeUpstreamBillingProbeSnapshotPublic(extra map[string]any) *UpstreamBillingProbeSnapshot {
+	return decodeUpstreamBillingProbeSnapshot(extra)
 }

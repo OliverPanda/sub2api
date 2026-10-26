@@ -1,5 +1,13 @@
 # 中转站充值交互对齐与 Bridge 落地
 
+> [!WARNING]
+> **历史交互与 Bridge 落地资料。**
+> 本文描述的是 Dujiao + Bridge 时期的实现，生产已正式切换为
+> **Sub2API 原生支付**。其中可复用的用户交互原则仍可参考，但不要按本文
+> 部署 Bridge、Dujiao、`/shop` 或 `/internal` 回调。现行方案见
+> [`PAYMENT_CN.md`](PAYMENT_CN.md) 和
+> [`deploy/ops/production/README.md`](../deploy/ops/production/README.md)。
+
 ## 1. 结论
 
 XDD API 的充值入口已经按成熟中转站的主流程落地：

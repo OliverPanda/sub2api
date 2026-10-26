@@ -18,11 +18,6 @@ fi
 public_url=${public_url%/}
 [[ "$public_url" =~ ^https://[A-Za-z0-9._:-]+$ ]] || die "invalid public URL: ${public_url}"
 
-payment_domain=$(env_get PAYMENT_DOMAIN || true)
-payment_domain=${payment_domain:-pay.xddapi.org.uk}
-[[ "$payment_domain" =~ ^[A-Za-z0-9.-]+$ ]] || die "invalid payment domain: ${payment_domain}"
-payment_url="https://${payment_domain}"
-
 retries=$(env_get SMOKE_TEST_RETRIES || true)
 retries=${retries:-6}
 [[ "$retries" =~ ^[0-9]+$ ]] || die "SMOKE_TEST_RETRIES must be an integer"
@@ -45,20 +40,7 @@ printf '%s' "$setup_json" | jq -e '.code == 0 and .data.needs_setup == false' >/
   die "unexpected /setup/status response: ${setup_json}"
 }
 
-log INFO "Checking Bridge health: ${public_url}/shop/healthz"
-bridge_health=$(curl "${curl_common[@]}" "${public_url}/shop/healthz")
-printf '%s' "$bridge_health" | jq -e '.status == "ok"' >/dev/null || {
-  die "unexpected /shop/healthz response: ${bridge_health}"
-}
-
-log INFO "Checking Dujiao payment backend: ${payment_url}/health"
-payment_code=$(curl --silent --show-error \
-  --connect-timeout 10 --max-time 25 \
-  --retry "$retries" --retry-delay 5 --retry-all-errors \
-  -o /dev/null -w '%{http_code}' "${payment_url}/health")
-[[ "$payment_code" =~ ^2[0-9][0-9]$ ]] || die "unexpected payment backend /health status: ${payment_code}"
-
-log INFO "Checking /shop canonical redirect"
+log INFO "Checking legacy /shop redirect to native payment"
 redirect_headers=$(curl --silent --show-error \
   --connect-timeout 10 --max-time 25 \
   --retry "$retries" --retry-delay 5 --retry-all-errors \
@@ -66,10 +48,10 @@ redirect_headers=$(curl --silent --show-error \
 redirect_status=$(printf '%s\n' "$redirect_headers" | awk 'toupper($1) ~ /^HTTP\// {code=$2} END {print code}')
 redirect_location=$(printf '%s\n' "$redirect_headers" | awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, ""); print $2}' | tail -n 1)
 [[ "$redirect_status" == "308" ]] || die "/shop must return 308, got ${redirect_status}"
-[[ "$redirect_location" == "/shop/" ]] || die "/shop Location must be /shop/, got ${redirect_location}"
+[[ "$redirect_location" == "/payment" ]] || die "/shop Location must be /payment, got ${redirect_location}"
 
-log INFO "Checking unsigned internal callback cannot reach Sub2API fallback"
-callback_file=$(mktemp "${TMPDIR:-/tmp}/xdd-bridge-callback-smoke.XXXXXX")
+log INFO "Checking retired internal callbacks are blocked"
+callback_file=$(mktemp "${TMPDIR:-/tmp}/xdd-internal-callback-smoke.XXXXXX")
 callback_code=$(curl --silent --show-error \
   --connect-timeout 10 --max-time 25 \
   --retry "$retries" --retry-delay 5 --retry-all-errors \
@@ -78,9 +60,6 @@ callback_code=$(curl --silent --show-error \
   --data '{"order_id":0,"status":"paid"}' \
   "${public_url}/internal/order-paid")
 rm -f "$callback_file"
-case "$callback_code" in
-  401|503) ;;
-  *) die "unsigned /internal/order-paid must return 401 or 503, got ${callback_code}" ;;
-esac
+[[ "$callback_code" == "404" ]] || die "retired /internal/order-paid must return 404, got ${callback_code}"
 
-log INFO "Public smoke test passed for ${public_url} and ${payment_url}"
+log INFO "Public smoke test passed for ${public_url}"

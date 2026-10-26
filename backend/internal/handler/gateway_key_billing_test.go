@@ -152,7 +152,7 @@ func TestBuildKeyBillingInfoAppliesPeakMultiplier(t *testing.T) {
 	now := time.Date(2026, time.July, 12, 10, 0, 0, 0, timezone.Location())
 	userRate := 0.8
 
-	got := buildKeyBillingInfo(apiKey, userRate, now)
+	got := buildKeyBillingInfo(apiKey, userRate, nil, nil, nil, now)
 
 	require.Equal(t, 1.2, got.GroupRateMultiplier)
 	require.NotNil(t, got.UserRateMultiplier)
@@ -188,6 +188,36 @@ func TestBuildKeyBillingInfoAppliesPeakMultiplier(t *testing.T) {
 	}
 }
 
+func TestBuildKeyBillingInfoIncludesWalletAndQuota(t *testing.T) {
+	groupID := int64(7)
+	apiKey := &service.APIKey{
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:             groupID,
+			RateMultiplier: 1,
+		},
+	}
+	now := time.Date(2026, time.July, 12, 10, 0, 0, 0, timezone.Location())
+	balance, quota, quotaUsed := 12.34, 50.0, 7.5
+
+	got := buildKeyBillingInfo(apiKey, 1, &balance, &quota, &quotaUsed, now)
+
+	require.NotNil(t, got.Balance)
+	require.Equal(t, balance, *got.Balance)
+	require.NotNil(t, got.Quota)
+	require.Equal(t, quota, *got.Quota)
+	require.NotNil(t, got.QuotaUsed)
+	require.Equal(t, quotaUsed, *got.QuotaUsed)
+
+	encoded, err := json.Marshal(got)
+	require.NoError(t, err)
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &fields))
+	require.JSONEq(t, "12.34", string(fields["balance"]))
+	require.JSONEq(t, "50", string(fields["quota"]))
+	require.JSONEq(t, "7.5", string(fields["quota_used"]))
+}
+
 func TestKeyBillingInfoJSONKeepsZeroPeakMultiplierWhenEnabled(t *testing.T) {
 	groupID := int64(7)
 	apiKey := &service.APIKey{
@@ -202,7 +232,7 @@ func TestKeyBillingInfoJSONKeepsZeroPeakMultiplierWhenEnabled(t *testing.T) {
 		},
 	}
 	now := time.Date(2026, time.July, 12, 12, 0, 0, 0, timezone.Location())
-	encoded, err := json.Marshal(buildKeyBillingInfo(apiKey, apiKey.Group.RateMultiplier, now))
+	encoded, err := json.Marshal(buildKeyBillingInfo(apiKey, apiKey.Group.RateMultiplier, nil, nil, nil, now))
 	require.NoError(t, err)
 
 	var fields map[string]json.RawMessage

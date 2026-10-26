@@ -157,8 +157,18 @@ func TestNormalizeOpenAIWSContextWindowBoundary(t *testing.T) {
 		require.Equal(t, "resp_old", gjson.GetBytes(updated, "previous_response_id").String())
 	})
 
-	t.Run("new_window_drops_previous_response_id", func(t *testing.T) {
+	t.Run("new_window_without_replay_context_keeps_previous_response_id", func(t *testing.T) {
 		payload := []byte("{\"type\":\"response.create\",\"previous_response_id\":\"resp_old\",\"client_metadata\":{\"x-codex-window-id\":\"window-b\"}}")
+		updated, boundary, err := normalizeOpenAIWSContextWindowBoundary(payload, "window-a")
+		require.NoError(t, err)
+		require.True(t, boundary.Changed)
+		require.False(t, boundary.PreviousResponseIDRemoved)
+		require.Equal(t, "window-b", boundary.WindowID)
+		require.Equal(t, "resp_old", gjson.GetBytes(updated, "previous_response_id").String())
+	})
+
+	t.Run("new_window_with_full_replay_context_drops_previous_response_id", func(t *testing.T) {
+		payload := []byte("{\"type\":\"response.create\",\"previous_response_id\":\"resp_old\",\"client_metadata\":{\"x-codex-window-id\":\"window-b\"},\"input\":[{\"role\":\"user\",\"content\":\"hello\"},{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"hi\"},{\"role\":\"user\",\"content\":\"world\"}]}")
 		updated, boundary, err := normalizeOpenAIWSContextWindowBoundary(payload, "window-a")
 		require.NoError(t, err)
 		require.True(t, boundary.Changed)
@@ -177,7 +187,7 @@ func TestNormalizeOpenAIWSContextWindowBoundary(t *testing.T) {
 	})
 
 	t.Run("embedded_turn_metadata_is_fallback", func(t *testing.T) {
-		payload := []byte("{\"type\":\"response.create\",\"previous_response_id\":\"resp_old\",\"client_metadata\":{\"x-codex-turn-metadata\":\"{\\\"window_id\\\":\\\"window-b\\\"}\"}}")
+		payload := []byte("{\"type\":\"response.create\",\"previous_response_id\":\"resp_old\",\"client_metadata\":{\"x-codex-turn-metadata\":\"{\\\"window_id\\\":\\\"window-b\\\"}\"},\"input\":[{\"role\":\"user\",\"content\":\"hello\"},{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"hi\"}]}")
 		updated, boundary, err := normalizeOpenAIWSContextWindowBoundary(payload, "window-a")
 		require.NoError(t, err)
 		require.True(t, boundary.Changed)
@@ -993,6 +1003,21 @@ func TestBuildOpenAIWSReplayInputSequence(t *testing.T) {
 		require.Len(t, items, 2)
 		require.Equal(t, "hello", gjson.GetBytes(items[0], "text").String())
 		require.Equal(t, "world", gjson.GetBytes(items[1], "text").String())
+	})
+
+	t.Run("previous_response_id_self_contained_current_input_not_duplicated", func(t *testing.T) {
+		items, exists, err := buildOpenAIWSReplayInputSequence(
+			lastFull,
+			true,
+			[]byte(`{"previous_response_id":"resp_1","input":[{"role":"user","content":"hello"},{"type":"message","role":"assistant","content":"assistant reply"},{"role":"user","content":"world"}]}`),
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, exists)
+		require.Len(t, items, 3, "当前输入已自包含时不得再叠加上一轮历史")
+		require.Equal(t, "hello", gjson.GetBytes(items[0], "content").String())
+		require.Equal(t, "assistant reply", gjson.GetBytes(items[1], "content").String())
+		require.Equal(t, "world", gjson.GetBytes(items[2], "content").String())
 	})
 }
 

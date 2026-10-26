@@ -113,6 +113,41 @@ export interface OpsThroughputTrendResponse {
   top_groups?: OpsThroughputGroupBreakdownItem[]
 }
 
+export interface OpsGroupQualityItem {
+  group_id: number
+  group_name: string
+  platform: string
+  request_count: number
+  success_count: number
+  error_count_sla: number
+  success_rate: number
+  upstream_error_rate: number
+  rate_limit_rate: number
+  p95_duration_ms: number | null
+  p95_ttft_ms: number | null
+  sample_count: number
+  sample_sufficient: boolean
+}
+
+export interface OpsGroupQualityResponse {
+  start_time: string
+  end_time: string
+  platform: string
+  min_sample: number
+  items: OpsGroupQualityItem[]
+  insufficient_sample_count: number
+}
+
+export interface OpsGroupQualityParams {
+  time_range?: '5m' | '30m' | '1h' | '6h' | '24h'
+  start_time?: string
+  end_time?: string
+  platform?: string
+  group_id?: number | null
+  mode?: OpsQueryMode
+  min_sample?: number
+}
+
 export type OpsRequestKind = 'success' | 'error'
 export type OpsRequestDetailsKind = OpsRequestKind | 'all'
 export type OpsRequestDetailsSort = 'created_at_desc' | 'duration_desc' | 'ttft_desc'
@@ -1025,6 +1060,17 @@ export async function getThroughputTrend(
   return data
 }
 
+export async function getGroupQualityRanking(
+  params: OpsGroupQualityParams,
+  options: OpsRequestOptions = {}
+): Promise<OpsGroupQualityResponse> {
+  const { data } = await apiClient.get<OpsGroupQualityResponse>('/admin/ops/dashboard/group-quality', {
+    params,
+    signal: options.signal
+  })
+  return data
+}
+
 export async function getLatencyHistogram(
   params: {
   time_range?: '5m' | '30m' | '1h' | '6h' | '24h'
@@ -1320,6 +1366,7 @@ export const opsAPI = {
   getDashboardSnapshotV2,
   getDashboardOverview,
   getThroughputTrend,
+  getGroupQualityRanking,
   getLatencyHistogram,
   getErrorTrend,
   getErrorDistribution,

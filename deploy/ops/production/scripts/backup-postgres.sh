@@ -56,8 +56,6 @@ backup_database() {
 }
 
 backup_database postgres sub2api
-backup_database bridge-postgres bridge
-backup_database dujiao-postgres dujiao
 
 {
   printf 'created_at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -68,8 +66,8 @@ backup_database dujiao-postgres dujiao
 } > "${bundle}/SHA256SUMS"
 chmod 0600 "${bundle}/SHA256SUMS"
 
-# Retention is applied only after all three verified backups have been
-# committed. Remove both the current bundle format and legacy flat dumps.
+# Retention is applied only after the verified backup has been committed.
+# Remove both the current bundle format and legacy flat dumps.
 find "$backup_dir" -mindepth 1 -maxdepth 1 -type d -name 'sub2api-*' \
   -mtime "+${retention_days}" -exec rm -rf {} +
 find "$backup_dir" -type f \( -name 'sub2api-*.dump' -o -name 'sub2api-*.dump.sha256' \) \

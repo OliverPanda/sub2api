@@ -230,3 +230,24 @@ func TestOrderViewIncludesPaymentContinuationFields(t *testing.T) {
 		t.Fatalf("credited_at = %#v, want %v", view["credited_at"], creditedAt)
 	}
 }
+
+func TestRedeemCodeForOrderFitsSub2APILimit(t *testing.T) {
+	orders := []string{
+		"xdd-20261024T020912-484b82b47b",
+		strings.Repeat("x", 33),
+	}
+	seen := make(map[string]bool, len(orders))
+	for _, orderNo := range orders {
+		code := redeemCodeForOrder(orderNo)
+		if len(code) == 0 || len(code) > 32 {
+			t.Fatalf("redeemCodeForOrder(%q) = %q (len %d), want 1..32 characters", orderNo, code, len(code))
+		}
+		if code != redeemCodeForOrder(orderNo) {
+			t.Fatalf("redeemCodeForOrder(%q) is not deterministic", orderNo)
+		}
+		if seen[code] {
+			t.Fatalf("duplicate redeem code %q", code)
+		}
+		seen[code] = true
+	}
+}

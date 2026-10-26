@@ -95,6 +95,60 @@ func (h *OpsHandler) GetDashboardThroughputTrend(c *gin.Context) {
 	response.Success(c, data)
 }
 
+// GetDashboardGroupQuality returns an SLA-scoped quality ranking for every
+// live group. Unlike the overview endpoint, this keeps all groups in the result
+// so operators can spot low-volume or recently failing groups instead of only
+// seeing the aggregate health of the selected scope.
+// GET /api/v1/admin/ops/dashboard/group-quality
+func (h *OpsHandler) GetDashboardGroupQuality(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	startTime, endTime, err := parseOpsTimeRange(c, "1h")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	filter := &service.OpsDashboardFilter{
+		StartTime: startTime,
+		EndTime:   endTime,
+		Platform:  strings.TrimSpace(c.Query("platform")),
+		QueryMode: parseOpsQueryMode(c),
+	}
+	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "Invalid group_id")
+			return
+		}
+		filter.GroupID = &id
+	}
+
+	minSample := 20
+	if v := strings.TrimSpace(c.Query("min_sample")); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil || parsed < 1 || parsed > 1000 {
+			response.BadRequest(c, "Invalid min_sample")
+			return
+		}
+		minSample = parsed
+	}
+
+	data, err := h.opsService.GetGroupQualityRanking(c.Request.Context(), filter, minSample)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, data)
+}
+
 // GetDashboardLatencyHistogram returns the latency distribution histogram (success requests).
 // GET /api/v1/admin/ops/dashboard/latency-histogram
 func (h *OpsHandler) GetDashboardLatencyHistogram(c *gin.Context) {

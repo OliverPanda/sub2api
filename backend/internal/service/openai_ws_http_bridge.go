@@ -250,6 +250,15 @@ func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, er
 	if body == nil {
 		return nil, errors.New("response.create payload must be a JSON object")
 	}
+	if previousResponseID, _ := body["previous_response_id"].(string); strings.TrimSpace(previousResponseID) != "" {
+		rawBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("validate bridge replay context: %w", err)
+		}
+		if !CanReplayOpenAIResponsesInputWithoutPreviousResponseID(rawBody) {
+			return nil, errors.New("cannot bridge continuation without a complete replay input; restart the conversation")
+		}
+	}
 	delete(body, "type")
 	delete(body, "generate")
 	delete(body, "previous_response_id")
@@ -258,64 +267,33 @@ func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, er
 	return json.Marshal(body)
 }
 
+// openAIWSToolCallReplayCollector 保存本轮完整模型输出，供无锚点续链和非工具
+// 对话恢复使用。只保存工具调用会让下一轮缺少 assistant 输出，安全门将无法证明
+// 上下文完整，最终表现为对话历史丢失。
 type openAIWSToolCallReplayCollector struct {
-	items    []json.RawMessage
-	seen     map[string]struct{}
-	allItems []json.RawMessage
-	allSeen  map[string]struct{}
+	items []json.RawMessage
+	seen  map[string]struct{}
 }
 
 func (c *openAIWSToolCallReplayCollector) AddEvent(eventType string, message []byte) {
 	switch strings.TrimSpace(eventType) {
 	case "response.output_item.done":
-		item := gjson.GetBytes(message, "item")
-		c.addAllItem(item)
-		c.addItem(item)
+		c.addItem(gjson.GetBytes(message, "item"))
 	case "response.completed", "response.done":
 		output := gjson.GetBytes(message, "response.output")
 		if !output.IsArray() {
 			return
 		}
 		for _, item := range output.Array() {
-			c.addAllItem(item)
 			c.addItem(item)
 		}
 	}
 }
 
-// Items/AllItems 返回浅拷贝头数组；正文由 collector 独立分配且此后不可变，
+// Items 返回浅拷贝头数组；正文由 collector 独立分配且此后不可变，
 // 调用方按 replay 所有权不变式共享持有。
 func (c *openAIWSToolCallReplayCollector) Items() []json.RawMessage {
 	return slices.Clone(c.items)
-}
-
-func (c *openAIWSToolCallReplayCollector) AllItems() []json.RawMessage {
-	return slices.Clone(c.allItems)
-}
-
-func (c *openAIWSToolCallReplayCollector) addAllItem(item gjson.Result) {
-	if !item.Exists() || item.Type != gjson.JSON {
-		return
-	}
-	raw := strings.TrimSpace(item.Raw)
-	if raw == "" || !strings.HasPrefix(raw, "{") || strings.TrimSpace(item.Get("type").String()) == "" {
-		return
-	}
-	key := strings.TrimSpace(item.Get("id").String())
-	if key == "" {
-		key = strings.TrimSpace(item.Get("call_id").String())
-	}
-	if key == "" {
-		key = raw
-	}
-	if c.allSeen == nil {
-		c.allSeen = make(map[string]struct{})
-	}
-	if _, ok := c.allSeen[key]; ok {
-		return
-	}
-	c.allSeen[key] = struct{}{}
-	c.allItems = append(c.allItems, json.RawMessage(raw))
 }
 
 func (c *openAIWSToolCallReplayCollector) addItem(item gjson.Result) {
@@ -323,10 +301,7 @@ func (c *openAIWSToolCallReplayCollector) addItem(item gjson.Result) {
 		return
 	}
 	raw := strings.TrimSpace(item.Raw)
-	if raw == "" || !strings.HasPrefix(raw, "{") {
-		return
-	}
-	if !isCodexToolCallContextItemType(item.Get("type").String()) {
+	if raw == "" || !strings.HasPrefix(raw, "{") || strings.TrimSpace(item.Get("type").String()) == "" {
 		return
 	}
 	key := strings.TrimSpace(item.Get("id").String())
@@ -688,7 +663,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 			result.wsReplayInput = replayInput
 			result.wsReplayInputExists = true
 		}
-		result.wsAccountFailoverReplayInput = replayCollector.AllItems()
+		result.wsAccountFailoverReplayInput = replayCollector.Items()
 		if imageCount > 0 {
 			result.ImageCount = imageCount
 			result.ImageSize = imageSizeTier

@@ -1,5 +1,13 @@
 # Dujiao-Next 下单、Sub2API 余额到账 Bridge
 
+> [!WARNING]
+> **历史设计资料，已停止用于生产。**
+> XDD API 生产已正式切换为 **Sub2API 原生支付**，生产 Compose、Caddy
+> 和发布链路不再部署或依赖 Dujiao-Next / Bridge。请勿按本文创建
+> `pay.xddapi.org.uk`、Bridge 回调或相关容器。现行方案见
+> [`PAYMENT_CN.md`](PAYMENT_CN.md) 和
+> [`deploy/ops/production/README.md`](../deploy/ops/production/README.md)。
+
 ## 1. 这套 Bridge 解决什么问题
 
 Sub2API 原生充值适合已有支付通道和自建收银台的场景。本项目的 Bridge 把充值拆成两个更容易替换的部分：

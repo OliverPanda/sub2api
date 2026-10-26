@@ -1,5 +1,13 @@
 # 香港服务器 + 境外域名接入微信/支付宝支付方案
 
+> [!WARNING]
+> **历史支付调研资料。**
+> 本文的主体资质、通道选择和合规信息仍可参考，但其中涉及 Dujiao、
+> Bridge、`pay.xddapi.org.uk` 的部署衔接已经停用。XDD API 生产已改为
+> **Sub2API 原生支付**，支付 Provider 直接在 Sub2API 后台配置。现行方案见
+> [`PAYMENT_CN.md`](PAYMENT_CN.md) 和
+> [`deploy/ops/production/README.md`](../deploy/ops/production/README.md)。
+
 ## 1. 先给结论
 
 服务器位于香港、域名在 Cloudflare，不会自动获得微信支付或支付宝的官方商户资格。支付资格取决于**收款主体、注册地、业务类型、KYC、网站内容、风控和通道审核**，不是服务器所在地。

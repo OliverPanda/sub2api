@@ -352,11 +352,17 @@ func sanitizeGrokCompactionReplayBody(body []byte) ([]byte, bool, error) {
 		changed = true
 	}
 	if previousID, _ := requestBody["previous_response_id"].(string); strings.TrimSpace(previousID) != "" && !HasFunctionCallOutput(requestBody) {
-		delete(requestBody, "previous_response_id")
-		if _, exists := requestBody["store"]; !exists {
-			requestBody["store"] = false
+		replayBody, marshalErr := marshalOpenAIUpstreamJSON(requestBody)
+		if marshalErr != nil {
+			return nil, false, fmt.Errorf("validate Grok compaction replay context: %w", marshalErr)
 		}
-		changed = true
+		if CanReplayOpenAIResponsesInputWithoutPreviousResponseID(replayBody) {
+			delete(requestBody, "previous_response_id")
+			if _, exists := requestBody["store"]; !exists {
+				requestBody["store"] = false
+			}
+			changed = true
+		}
 	}
 	if !changed {
 		return body, false, nil

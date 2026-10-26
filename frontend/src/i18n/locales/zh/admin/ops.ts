@@ -142,6 +142,33 @@ export default {
       errorTrend: '错误趋势',
       errorDistribution: '错误分布',
       switchRate: '平均账号切换',
+      groupQuality: {
+        title: '分组质量排行',
+        description: '按至少 {sample} 个 SLA 样本统计；样本不足的分组排在后面，避免小样本误判。',
+        insufficient: '样本不足：{count}',
+        refresh: '刷新',
+        retry: '重试',
+        empty: '当前时间窗口内暂无可用分组数据',
+        selectHint: '点击查看该分组的请求与错误明细',
+        showAll: '展开全部 {count} 个分组',
+        showTop: '收起，仅显示前 10 个',
+        failedToLoad: '加载分组质量排行失败',
+        columns: {
+          group: '分组',
+          requests: '请求数',
+          samples: 'SLA 样本',
+          successRate: '成功率',
+          upstreamErrorRate: '上游错误率',
+          rateLimitRate: '429 比例',
+          p95Duration: 'P95 时长',
+          p95TTFT: 'P95 TTFT',
+          status: '状态'
+        },
+        status: {
+          measured: '已测量',
+          insufficient: '样本不足'
+        }
+      },
       // Health Score & Diagnosis
       health: '健康',
       healthCondition: '健康状况',
@@ -810,6 +837,7 @@ export default {
         outputTps: '每条有效用量记录的输出 Token ÷ 总耗时（含首字等待），再按当前时间、平台和分组计算分位数。输出可含推理 Token，不重复相加。P50 为中位数，P5/P10 反映较慢请求；数值越高越快。排除图片、Live、无有效输出或耗时的记录。样本来自仍保留的使用明细；无样本或统计暂不可用时显示 —。',
         totalRequests: '当前时间窗口内的总请求数和Token消耗量。',
         throughputTrend: '当前窗口内的请求/QPS 与 token/TPS 趋势。',
+        groupQuality: '按分组汇总成功率、上游错误率、429 比例和 P95 延迟。成功率 = 成功请求 /（成功请求 + 非业务限制的客户端可见错误）；上游错误率排除 429/529；业务限制和 count_tokens 请求不计入 SLA 样本。',
         switchRateTrend: '近5小时内账号切换次数 / 请求总数的趋势（平均切换次数）。',
         latencyHistogram: '成功请求的请求时长分布（毫秒）。',
         errorTrend: '错误趋势（SLA 口径排除业务限制；上游错误率排除 429/529）。',

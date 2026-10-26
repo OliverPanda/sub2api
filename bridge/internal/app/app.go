@@ -211,7 +211,7 @@ func (a *App) creditOrder(ctx context.Context, order *domain.Order) (*domain.Ord
 	if !ok {
 		return a.store.GetOrderForUser(ctx, order.BridgeOrderNo, order.UserID)
 	}
-	code := "xddshop-" + claimed.BridgeOrderNo
+	code := redeemCodeForOrder(claimed.BridgeOrderNo)
 	notes := fmt.Sprintf("Dujiao order %s, bridge order %s", claimed.DujiaoOrderNo, claimed.BridgeOrderNo)
 	err = a.sub2api.RedeemBalance(ctx, claimed.UserID, claimed.CreditCents, code, notes, redeemIdempotencyKey(claimed.BridgeOrderNo))
 	if err != nil {
@@ -222,6 +222,16 @@ func (a *App) creditOrder(ctx context.Context, order *domain.Order) (*domain.Ord
 		return claimed, fmt.Errorf("redeem succeeded but saving credited state failed: %w", err)
 	}
 	return a.store.GetOrderForUser(ctx, claimed.BridgeOrderNo, claimed.UserID)
+}
+
+func redeemCodeForOrder(orderNo string) string {
+	orderNo = strings.TrimSpace(orderNo)
+	const maxRedeemCodeLength = 32
+	if len(orderNo) <= maxRedeemCodeLength {
+		return orderNo
+	}
+	sum := sha256.Sum256([]byte(orderNo))
+	return "xdd-" + hex.EncodeToString(sum[:14])
 }
 
 func redeemIdempotencyKey(orderNo string) string {

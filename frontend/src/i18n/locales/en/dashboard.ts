@@ -349,6 +349,8 @@ export default {
     standardCost: 'Standard',
     actualCost: 'Actual',
     accountCost: 'Cost',
+    profit: 'Profit',
+    profitHint: 'Profit = actual cost − account cost (estimated; real recharge spend comes from your billing records)',
     userBilled: 'User billed',
     accountBilled: 'Account billed',
     resetNow: 'Now',

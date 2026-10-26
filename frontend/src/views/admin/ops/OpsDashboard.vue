@@ -67,6 +67,20 @@
         </div>
       </div>
 
+      <!-- Row: Group quality ranking -->
+      <div v-if="opsEnabled && !(loading && !hasLoadedOnce)" class="grid grid-cols-1 gap-6">
+        <OpsGroupQualityRanking
+          :platform-filter="platform"
+          :group-id-filter="groupId"
+          :time-range="timeRange"
+          :custom-start-time="customStartTime"
+          :custom-end-time="customEndTime"
+          :query-mode="queryMode"
+          :refresh-token="dashboardRefreshToken"
+          @select-group="handleThroughputSelectGroup"
+        />
+      </div>
+
       <!-- Row: Visual Analysis (baseline 3-up grid) -->
       <div v-if="opsEnabled && !(loading && !hasLoadedOnce)" class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <OpsLatencyChart :latency-data="latencyHistogram" :loading="loadingLatency" />
@@ -166,6 +180,7 @@ import OpsErrorDetailsModal from './components/OpsErrorDetailsModal.vue'
 import OpsErrorTrendChart from './components/OpsErrorTrendChart.vue'
 import OpsLatencyChart from './components/OpsLatencyChart.vue'
 import OpsThroughputTrendChart from './components/OpsThroughputTrendChart.vue'
+import OpsGroupQualityRanking from './components/OpsGroupQualityRanking.vue'
 import OpsSwitchRateTrendChart from './components/OpsSwitchRateTrendChart.vue'
 import OpsAlertEventsCard from './components/OpsAlertEventsCard.vue'
 import OpsOpenAITokenStatsCard from './components/OpsOpenAITokenStatsCard.vue'
