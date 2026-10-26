@@ -44,7 +44,6 @@ func (r *opsRepository) GetGroupQualityRanking(ctx context.Context, filter *serv
 	if platform := strings.TrimSpace(strings.ToLower(filter.Platform)); platform != "" {
 		groupClauses = append(groupClauses, fmt.Sprintf("LOWER(g.platform) = $%d", next))
 		args = append(args, platform)
-		next++
 	}
 
 	query := `
