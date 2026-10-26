@@ -34,7 +34,12 @@
 	# Bridge/Dujiao routes are intentionally not proxied anymore.
 	redir /shop /payment 308
 	redir /shop/* /payment 308
-	respond /internal/* 404
+
+	# Keep this ahead of the catch-all handle. A bare respond directive is
+	# sorted after handle by Caddy and would never see these requests.
+	handle /internal/* {
+		respond 404
+	}
 
 	handle {
 		reverse_proxy sub2api:8080 {

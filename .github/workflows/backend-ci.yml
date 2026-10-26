@@ -68,6 +68,20 @@ jobs:
             -v "$tmp/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro" \
             -v "$tmp/certs:/etc/caddy/certs:ro" \
             caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile
+          docker run --rm \
+            -e PUBLIC_DOMAIN=api.xddapi.org.uk \
+            -v "$tmp/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -v "$tmp/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro" \
+            -v "$tmp/certs:/etc/caddy/certs:ro" \
+            caddy:2.10.2-alpine caddy adapt --config /etc/caddy/Caddyfile --pretty > "$tmp/caddy.json"
+          # Caddy sorts a bare respond after handle. The retired callback
+          # blocker must therefore be an earlier handle than the catch-all proxy.
+          jq -e '
+            .apps.http.servers.srv0.routes[0].handle[0].routes as $routes
+            | ($routes | map([.match[]?.path[]?] | index("/internal/*") != null) | index(true)) as $blocked
+            | ($routes | map((([.match[]?.path[]?] | length) == 0) and ([.handle[]?.handler] | index("subroute") != null)) | index(true)) as $fallback
+            | $blocked != null and $fallback != null and $blocked < $fallback
+          ' "$tmp/caddy.json" >/dev/null
 
   test_unit:
     runs-on: ubuntu-latest
