@@ -3,8 +3,6 @@ package admin
 import (
 	"math"
 	"net/http"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -27,7 +25,7 @@ type upstreamBalanceEntry struct {
 	LastError   string   `json:"last_error,omitempty"`
 }
 
-// upstreamBalanceEntry is one row of UpstreamBalancesResponse.
+// UpstreamBalanceEntry is one row of UpstreamBalancesResponse.
 type UpstreamBalanceEntry = upstreamBalanceEntry
 
 // UpstreamBalancesResponse aggregates wallet balances of every probed upstream
@@ -90,8 +88,8 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 		g, ok := groups[baseURL]
 		if !ok {
 			g = &group{
-				baseURL: baseURL,
-				entry:   upstreamBalanceEntry{BaseURL: baseURL},
+				baseURL:  baseURL,
+				entry:    upstreamBalanceEntry{BaseURL: baseURL},
 				statuses: make(map[string]int),
 			}
 			groups[baseURL] = g
@@ -167,6 +165,3 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 		Accounts:    totalAccounts,
 	})
 }
-
-var _ = sort.Strings
-var _ = strconv.Atoi
