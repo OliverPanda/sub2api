@@ -171,7 +171,6 @@
             </template>
           </AccountTableActions>
         </div>
-        <UpstreamBalancesPanel v-if="showUpstreamBalances" :show="showUpstreamBalances" />
         <div
           v-if="hasPendingListSync"
           class="mt-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200"
@@ -186,6 +185,7 @@
         </div>
       </template>
       <template #table>
+        <UpstreamBalancesPanel v-if="showUpstreamBalances" :show="showUpstreamBalances" />
         <AccountBulkActionsBar
           :selected-ids="selIds"
           :total-results="pagination.total"
