@@ -1,7 +1,7 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import UpstreamBalancesModal from '../UpstreamBalancesModal.vue'
+import UpstreamBalancesPanel from '../UpstreamBalancesPanel.vue'
 
 const mocks = vi.hoisted(() => ({
   getUpstreamBalances: vi.fn(),
@@ -26,15 +26,7 @@ vi.mock('vue-i18n', () => ({
 
 enableAutoUnmount(afterEach)
 
-const mountModal = (show = false) =>
-  mount(UpstreamBalancesModal, {
-    props: { show },
-    global: {
-      stubs: {
-        BaseDialog: { template: '<div v-if="show"><slot /></div>', props: ['show'] }
-      }
-    }
-  })
+const mountPanel = (show = false) => mount(UpstreamBalancesPanel, { props: { show } })
 
 beforeEach(() => {
   mocks.getUpstreamBalances.mockReset().mockResolvedValue({
@@ -53,21 +45,23 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('UpstreamBalancesModal', () => {
-  it('loads persisted balances only when the dialog opens', async () => {
-    const wrapper = mountModal()
+describe('UpstreamBalancesPanel', () => {
+  it('loads persisted balances only when the panel is shown', async () => {
+    const wrapper = mountPanel()
     expect(mocks.getUpstreamBalances).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="upstream-balances-panel"]').exists()).toBe(false)
 
     await wrapper.setProps({ show: true })
     await flushPromises()
 
     expect(mocks.getUpstreamBalances).toHaveBeenCalledWith(1, 100)
+    expect(wrapper.get('[data-testid="upstream-balances-panel"]').classes()).toContain('mt-4')
     expect(wrapper.get('[data-testid="upstream-balances-total"]').text()).toBe('$32.50')
     expect(wrapper.findAll('[data-testid="upstream-balance-item"]').map(item => item.text())).toEqual(['$32.50', 'admin.accounts.upstreamBalances.unknown'])
   })
 
   it('reloads the saved snapshot when refresh is clicked', async () => {
-    const wrapper = mountModal(true)
+    const wrapper = mountPanel(true)
     await flushPromises()
 
     await wrapper.get('[data-testid="upstream-balances-refresh"]').trigger('click')
