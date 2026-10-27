@@ -376,11 +376,13 @@ export default {
       },
       upstreamBalances: {
         title: 'Upstream balances',
+        viewBalances: 'View upstream balances',
         total: 'Total upstream balance (A+B+C)',
         refresh: 'Refresh balances',
         refreshing: 'Refreshing...',
         loadFailed: 'Failed to load upstream balances',
         noData: 'No balance data yet; enable automatic probing and wait for a successful probe.',
+        snapshotHint: 'Balances come from the latest billing probe snapshot; refreshing only reloads saved results and does not probe upstreams.',
         staleHint: 'Balances are stale for the following accounts:',
         probeFailedHint: '{count} account(s) last probed unsuccessfully; their balances are excluded from the total.',
         partialHint: 'Some accounts did not report a balance; the total includes probed accounts only.',

@@ -1,59 +1,6 @@
 <template>
   <AppLayout>
     <TablePageLayout>
-      <div class="mb-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {{ t('admin.accounts.upstreamBalances.total') }}
-            </p>
-            <p class="text-2xl font-bold tabular-nums text-gray-900 dark:text-white" data-testid="upstream-balances-total">
-              <template v-if="upstreamBalances.has_total">${{ upstreamBalances.total.toFixed(2) }}</template>
-              <template v-else>-</template>
-            </p>
-          </div>
-          <button
-            class="btn btn-secondary px-3 py-1.5 text-xs"
-            :disabled="upstreamBalancesLoading"
-            data-testid="upstream-balances-refresh"
-            @click="refreshUpstreamBalances"
-          >
-            <Icon name="refresh" size="xs" :class="{ 'animate-spin': upstreamBalancesLoading }" />
-            <span class="ml-1">{{ upstreamBalancesLoading ? t('admin.accounts.upstreamBalances.refreshing') : t('admin.accounts.upstreamBalances.refresh') }}</span>
-          </button>
-        </div>
-        <div
-          v-if="upstreamBalances.probe_failed > 0"
-          class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200"
-        >
-          {{ t('admin.accounts.upstreamBalances.probeFailedHint', { count: upstreamBalances.probe_failed }) }}
-        </div>
-        <div
-          v-else-if="upstreamBalances.has_total && upstreamBalances.items.some((item) => !item.has_balance)"
-          class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200"
-        >
-          {{ t('admin.accounts.upstreamBalances.partialHint') }}
-        </div>
-        <div v-if="upstreamBalances.items.length" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <span
-            v-for="item in upstreamBalances.items"
-            :key="item.account_id"
-            class="inline-flex items-center gap-1"
-            :class="item.has_balance ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'"
-          >
-            <span class="font-medium">{{ item.name }}:</span>
-            <span class="tabular-nums" data-testid="upstream-balance-item">
-              {{ item.has_balance ? `$${(item.balance ?? 0).toFixed(2)}` : t('admin.accounts.upstreamBalances.unknown') }}
-            </span>
-          </span>
-        </div>
-        <p
-          v-else
-          class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-        >
-          {{ t('admin.accounts.upstreamBalances.noData') }}
-        </p>
-      </div>
       <template #filters>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
@@ -69,6 +16,16 @@
             @refresh="handleManualRefresh"
             @create="showCreate = true"
           >
+            <template #before>
+              <button
+                class="btn btn-secondary"
+                data-testid="view-upstream-balances"
+                @click="showUpstreamBalances = true"
+              >
+                <Icon name="chartBar" size="sm" />
+                <span>{{ t('admin.accounts.upstreamBalances.viewBalances') }}</span>
+              </button>
+            </template>
             <template #after>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
@@ -538,6 +495,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
+    <UpstreamBalancesModal :show="showUpstreamBalances" @close="showUpstreamBalances = false" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
   </AppLayout>
 </template>
@@ -569,6 +527,7 @@ import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
+import UpstreamBalancesModal from '@/components/admin/account/UpstreamBalancesModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
@@ -590,7 +549,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
-import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBalancesResponse, UpstreamBillingProbeSnapshot } from '@/types'
+import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -679,22 +638,8 @@ const upstreamBillingProbeGloballyEnabled = ref<boolean | undefined>(undefined)
 const upstreamBillingNow = ref(Date.now())
 const upstreamBillingRateETag = ref<string | null>(null)
 const upstreamBillingRateRefreshing = ref(false)
+const showUpstreamBalances = ref(false)
 let upstreamBillingRateAbortController: AbortController | null = null
-
-const upstreamBalances = ref<UpstreamBalancesResponse>({ items: [], total: 0, has_total: false, probe_failed: 0 })
-const upstreamBalancesLoading = ref(false)
-const refreshUpstreamBalances = async () => {
-  if (upstreamBalancesLoading.value) return
-  upstreamBalancesLoading.value = true
-  try {
-    upstreamBalances.value = await adminAPI.accounts.getUpstreamBalances(1, 100)
-  } catch (error) {
-    console.error('Failed to load upstream balances:', error)
-    appStore.showError(t('admin.accounts.upstreamBalances.loadFailed'))
-  } finally {
-    upstreamBalancesLoading.value = false
-  }
-}
 useIntervalFn(() => { upstreamBillingNow.value = Date.now() }, 60_000)
 
 // Account tools dropdown
@@ -2607,7 +2552,6 @@ onMounted(async () => {
 
   load()
   loadUpstreamBillingProbeGlobalState()
-  refreshUpstreamBalances()
   const [proxiesResult, groupsResult] = await Promise.allSettled([
     adminAPI.proxies.getAll(),
     adminAPI.groups.getAll()

@@ -93,6 +93,11 @@ const AccountStatsModalStub = defineComponent({
   template: '<div data-test="stats-account">{{ show ? account?.name : "" }}</div>'
 })
 
+const UpstreamBalancesModalStub = defineComponent({
+  props: { show: Boolean },
+  template: '<div data-test="upstream-balances-modal">{{ show }}</div>'
+})
+
 function mountView(stubActionMenu = true) {
   return mount(AccountsView, {
     attachTo: document.body,
@@ -101,7 +106,7 @@ function mountView(stubActionMenu = true) {
         AppLayout: { template: '<div><slot /></div>' },
         TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
         DataTable: DataTableStub,
-        AccountTableActions: { template: '<div><slot name="after" /></div>' },
+        AccountTableActions: { template: '<div><slot name="before" /><slot name="after" /></div>' },
         AccountTableFilters: true,
         AccountBulkActionsBar: true,
         Pagination: true,
@@ -111,6 +116,7 @@ function mountView(stubActionMenu = true) {
         ReAuthAccountModal: true,
         AccountTestModal: AccountTestModalStub,
         AccountStatsModal: AccountStatsModalStub,
+        UpstreamBalancesModal: UpstreamBalancesModalStub,
         ScheduledTestsPanel: true,
         SyncFromCrsModal: true,
         TempUnschedStatusModal: true,
@@ -186,6 +192,17 @@ describe('admin AccountsView lite account list', () => {
       expect.objectContaining({ lite: '1' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+    wrapper.unmount()
+  })
+
+  it('opens the upstream balances overview from the toolbar button', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="upstream-balances-total"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="view-upstream-balances"]').trigger('click')
+
+    expect(wrapper.get('[data-test="upstream-balances-modal"]').text()).toBe('true')
     wrapper.unmount()
   })
 
