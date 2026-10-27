@@ -55,7 +55,7 @@ describe('UpstreamBalancesPanel', () => {
     await flushPromises()
 
     expect(mocks.getUpstreamBalances).toHaveBeenCalledWith(1, 100)
-    expect(wrapper.get('[data-testid="upstream-balances-panel"]').classes()).toContain('mt-4')
+    expect(wrapper.get('[data-testid="upstream-balances-panel"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="upstream-balances-total"]').text()).toBe('$32.50')
     expect(wrapper.findAll('[data-testid="upstream-balance-item"]').map(item => item.text())).toEqual(['$32.50', 'admin.accounts.upstreamBalances.unknown'])
   })

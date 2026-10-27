@@ -104,7 +104,7 @@ function mountView(stubActionMenu = true) {
     global: {
       stubs: {
         AppLayout: { template: '<div><slot /></div>' },
-        TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
+        TablePageLayout: { template: '<div><slot name="filters" /><slot name="pre-table" /><slot name="table" /><slot name="pagination" /></div>' },
         DataTable: DataTableStub,
         AccountTableActions: { template: '<div><slot name="before" /><slot name="after" /></div>' },
         AccountTableFilters: true,

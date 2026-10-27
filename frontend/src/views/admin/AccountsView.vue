@@ -184,8 +184,10 @@
           </button>
         </div>
       </template>
-      <template #table>
+      <template #pre-table>
         <UpstreamBalancesPanel v-if="showUpstreamBalances" :show="showUpstreamBalances" />
+      </template>
+      <template #table>
         <AccountBulkActionsBar
           :selected-ids="selIds"
           :total-results="pagination.total"

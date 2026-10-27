@@ -1,7 +1,7 @@
 <template>
   <section
     v-if="show"
-    class="mt-4 space-y-2"
+    class="space-y-2"
     data-testid="upstream-balances-panel"
     :aria-label="t('admin.accounts.upstreamBalances.title')"
   >
