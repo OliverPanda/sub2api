@@ -16,16 +16,6 @@
             @refresh="handleManualRefresh"
             @create="showCreate = true"
           >
-            <template #before>
-              <button
-                class="btn btn-secondary"
-                data-testid="view-upstream-balances"
-                @click="showUpstreamBalances = true"
-              >
-                <Icon name="chartBar" size="sm" />
-                <span>{{ t('admin.accounts.upstreamBalances.viewBalances') }}</span>
-              </button>
-            </template>
             <template #after>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
@@ -183,9 +173,6 @@
             {{ t('admin.accounts.listPendingSyncAction') }}
           </button>
         </div>
-      </template>
-      <template #pre-table>
-        <UpstreamBalancesPanel v-if="showUpstreamBalances" :show="showUpstreamBalances" />
       </template>
       <template #table>
         <AccountBulkActionsBar
@@ -529,7 +516,6 @@ import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
-import UpstreamBalancesPanel from '@/components/admin/account/UpstreamBalancesPanel.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
@@ -640,7 +626,6 @@ const upstreamBillingProbeGloballyEnabled = ref<boolean | undefined>(undefined)
 const upstreamBillingNow = ref(Date.now())
 const upstreamBillingRateETag = ref<string | null>(null)
 const upstreamBillingRateRefreshing = ref(false)
-const showUpstreamBalances = ref(false)
 let upstreamBillingRateAbortController: AbortController | null = null
 useIntervalFn(() => { upstreamBillingNow.value = Date.now() }, 60_000)
 

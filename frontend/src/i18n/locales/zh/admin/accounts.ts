@@ -233,6 +233,8 @@ export default {
         probeFailedHint: '{count} 个账号最近一次探测失败，其余额未计入总额。',
         partialHint: '部分账号未上报余额，总余额仅包含已探测成功的账号。',
         receivedAt: '更新于：{value}',
+        balanceColumn: '余额',
+        receivedAtTitle: '更新时间',
         unknown: '未知'
       },
       allPrivacyModes: '全部Privacy状态',
@@ -452,9 +454,15 @@ export default {
       accountSchedulingThresholdOverrideValue: '账号阈值百分比',
       accountSchedulingThresholdOverrideDisabledHint:
         '1-100，达到该用量百分比后临时不可调度；100 表示禁用当前账号自动停调。',
+      table: {
+        account: '账号',
+        platform: '平台',
+        status: '状态'
+      },
       status: {
         active: '正常',
         inactive: '停用',
+        disabled: '已禁用',
         expired: '已过期',
         error: '错误',
         cooldown: '冷却中',

@@ -232,9 +232,15 @@ export default {
       accountSchedulingThresholdOverrideValue: 'Account threshold percent',
       accountSchedulingThresholdOverrideDisabledHint:
         'Use 1-100. The account becomes temporarily unschedulable after reaching this usage percent; 100 disables it for this account.',
+      table: {
+        account: 'Account',
+        platform: 'Platform',
+        status: 'Status'
+      },
       status: {
         active: 'Active',
         inactive: 'Inactive',
+        disabled: 'Disabled',
         expired: 'Expired',
         error: 'Error',
         cooldown: 'Cooldown',
@@ -387,6 +393,8 @@ export default {
         probeFailedHint: '{count} account(s) last probed unsuccessfully; their balances are excluded from the total.',
         partialHint: 'Some accounts did not report a balance; the total includes probed accounts only.',
         receivedAt: 'Updated: {value}',
+        balanceColumn: 'Balance',
+        receivedAtTitle: 'Updated',
         unknown: 'Unknown'
       },
       allPrivacyModes: 'All Privacy States',
