@@ -395,6 +395,16 @@ export default {
         receivedAt: 'Updated: {value}',
         balanceColumn: 'Balance',
         receivedAtTitle: 'Updated',
+        upstreamColumn: 'Upstream',
+        accountsColumn: 'Probed/Accounts',
+        accountsCount: '{count} accounts',
+        probe: {
+          ok: 'OK',
+          partial: 'Partial',
+          failed: 'Failed',
+          unsupported: 'Unsupported',
+          unknown: 'Unknown'
+        },
         unknown: 'Unknown'
       },
       allPrivacyModes: 'All Privacy States',

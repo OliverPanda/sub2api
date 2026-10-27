@@ -3,6 +3,7 @@ package admin
 import (
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -11,14 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// UpstreamBalanceItem is one account's last-known upstream wallet snapshot.
-// Balance derives from the upstream billing probe's optional wallet fields;
-// accounts without a fresh probe report HasBalance=false instead of zero.
-type UpstreamBalanceItem struct {
-	AccountID   int64    `json:"account_id"`
-	Name        string   `json:"name"`
-	Platform    string   `json:"platform"`
-	Status      string   `json:"status"`
+// upstreamBalanceEntry aggregates every API-key account that shares the same
+// upstream base URL so operators see one row per provider, not per account.
+type upstreamBalanceEntry struct {
+	BaseURL     string   `json:"base_url"`
+	Accounts    int      `json:"accounts"`
+	OKAccounts  int      `json:"ok_accounts"`
 	Balance     *float64 `json:"balance,omitempty"`
 	Currency    string   `json:"currency,omitempty"`
 	HasBalance  bool     `json:"has_balance"`
@@ -28,19 +27,24 @@ type UpstreamBalanceItem struct {
 	LastError   string   `json:"last_error,omitempty"`
 }
 
-// UpstreamBalancesResponse aggregates the wallet balances of every probed
-// upstream account so operators can see total upstream purchasing power
-// (a+b+c) alongside each provider's individual remaining amount.
+// upstreamBalanceEntry is one row of UpstreamBalancesResponse.
+type UpstreamBalanceEntry = upstreamBalanceEntry
+
+// UpstreamBalancesResponse aggregates wallet balances of every probed upstream
+// (grouped by base URL) so operators can see total upstream purchasing power
+// (a+b+c) alongside each provider's remaining amount and health.
 type UpstreamBalancesResponse struct {
-	Items       []UpstreamBalanceItem `json:"items"`
-	Total       float64               `json:"total"`
-	HasTotal    bool                  `json:"has_total"`
-	ProbeFailed int                   `json:"probe_failed"`
+	Items       []UpstreamBalanceEntry `json:"items"`
+	Total       float64                `json:"total"`
+	HasTotal    bool                   `json:"has_total"`
+	ProbeFailed int                    `json:"probe_failed"`
+	Accounts    int                    `json:"accounts"`
 }
 
 // GetUpstreamBalances returns persisted upstream wallet snapshots for every
-// API-key account. It never probes an upstream; values come from the last
-// successful billing probe persisted in accounts.extra.
+// API-key account, aggregated by upstream base URL. It never probes an
+// upstream; values come from the last successful billing probe persisted in
+// accounts.extra.
 //
 // GET /api/v1/admin/accounts/upstream-balances
 func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
@@ -49,87 +53,120 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 		return
 	}
 
-	page, pageSize := response.ParsePagination(c)
 	platform := c.Query("platform")
-	accountType := c.Query("type")
-	status := c.Query("status")
-	search := strings.TrimSpace(c.Query("search"))
-	if len(search) > 100 {
-		search = search[:100]
-	}
-	privacyMode := strings.TrimSpace(c.Query("privacy_mode"))
-	sortBy := c.DefaultQuery("sort_by", "name")
-	sortOrder := c.DefaultQuery("sort_order", "asc")
-
-	var groupID int64
-	if groupQuery := c.Query("group"); groupQuery != "" {
-		if groupQuery == accountListGroupUngroupedQueryValue {
-			groupID = service.AccountListGroupUngrouped
-		} else {
-			parsed, err := strconv.ParseInt(groupQuery, 10, 64)
-			if err != nil || parsed < 0 {
-				response.BadRequest(c, "invalid group filter")
-				return
-			}
-			groupID = parsed
-		}
-	}
 
 	accounts, _, err := h.adminService.ListAccounts(
-		c.Request.Context(), page, pageSize, platform, accountType, status,
-		search, groupID, privacyMode, sortBy, sortOrder,
+		c.Request.Context(), 1, 1000, platform, "", "", "", 0, "", "name", "asc",
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
-	items := make([]UpstreamBalanceItem, 0, len(accounts))
-	var sum float64
-	hasTotal := false
-	probeFailed := 0
+	type group struct {
+		baseURL     string
+		entry       upstreamBalanceEntry
+		sum         float64
+		hasBalance  bool
+		receivedAt  string
+		okCount     int
+		probeFailed int
+		statuses    map[string]int
+	}
+	groups := make(map[string]*group)
+	var order []string
+	totalAccounts := 0
+	probeFailedTotal := 0
+
 	for _, account := range accounts {
-		item := UpstreamBalanceItem{
-			AccountID: account.ID,
-			Name:      account.Name,
-			Platform:  account.Platform,
-			Status:    account.Status,
-		}
 		if account.Type != service.AccountTypeAPIKey {
-			items = append(items, item)
 			continue
 		}
+		totalAccounts++
+		baseURL := strings.TrimSpace(account.GetCredential("base_url"))
+		if baseURL == "" {
+			baseURL = account.Platform
+		}
+		g, ok := groups[baseURL]
+		if !ok {
+			g = &group{
+				baseURL: baseURL,
+				entry:   upstreamBalanceEntry{BaseURL: baseURL},
+				statuses: make(map[string]int),
+			}
+			groups[baseURL] = g
+			order = append(order, baseURL)
+		}
+		g.entry.Accounts++
 		snapshot := service.DecodeUpstreamBillingProbeSnapshotPublic(account.Extra)
 		if snapshot == nil {
-			items = append(items, item)
 			continue
 		}
-		item.ProbeStatus = snapshot.Status
-		item.LastError = snapshot.LastError
-		if snapshot.ReceivedAt != nil {
-			item.ReceivedAt = snapshot.ReceivedAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+		g.statuses[snapshot.Status]++
+		if snapshot.Status == service.UpstreamBillingProbeStatusOK {
+			g.okCount++
 		}
 		if snapshot.Status == service.UpstreamBillingProbeStatusFailed {
-			probeFailed++
+			g.probeFailed++
+			probeFailedTotal++
+			if g.entry.LastError == "" {
+				g.entry.LastError = snapshot.LastError
+			}
+		}
+		if snapshot.ReceivedAt != nil {
+			ts := snapshot.ReceivedAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+			if ts > g.receivedAt {
+				g.receivedAt = ts
+			}
 		}
 		if snapshot.Status == service.UpstreamBillingProbeStatusOK && snapshot.Data != nil {
 			if raw, ok := snapshot.Data["balance"]; ok {
 				if value, ok := raw.(float64); ok && !math.IsNaN(value) && !math.IsInf(value, 0) {
-					item.Balance = &value
-					item.HasBalance = true
-					item.Currency = "USD"
-					sum += value
-					hasTotal = true
+					g.sum += value
+					g.hasBalance = true
 				}
 			}
 		}
-		items = append(items, item)
+	}
+
+	items := make([]UpstreamBalanceEntry, 0, len(groups))
+	var total float64
+	hasTotal := false
+	for _, key := range order {
+		g := groups[key]
+		entry := g.entry
+		entry.OKAccounts = g.okCount
+		if g.hasBalance {
+			value := g.sum
+			entry.Balance = &value
+			entry.HasBalance = true
+			entry.Currency = "USD"
+			entry.ReceivedAt = g.receivedAt
+			total += value
+			hasTotal = true
+		}
+		// Derive an aggregate probe status for the upstream.
+		switch {
+		case g.okCount == entry.Accounts:
+			entry.ProbeStatus = service.UpstreamBillingProbeStatusOK
+		case g.probeFailed == entry.Accounts:
+			entry.ProbeStatus = service.UpstreamBillingProbeStatusFailed
+		case g.okCount > 0:
+			entry.ProbeStatus = "partial"
+		default:
+			entry.ProbeStatus = "unknown"
+		}
+		items = append(items, entry)
 	}
 
 	response.Success(c, UpstreamBalancesResponse{
 		Items:       items,
-		Total:       sum,
+		Total:       total,
 		HasTotal:    hasTotal,
-		ProbeFailed: probeFailed,
+		ProbeFailed: probeFailedTotal,
+		Accounts:    totalAccounts,
 	})
 }
+
+var _ = sort.Strings
+var _ = strconv.Atoi

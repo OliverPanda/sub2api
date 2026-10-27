@@ -15,6 +15,9 @@
                 </h2>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {{ t('admin.accounts.upstreamBalances.total') }}
+                  <span v-if="balances.accounts" class="ml-1 text-gray-400 dark:text-gray-500">
+                    · {{ t('admin.accounts.upstreamBalances.accountsCount', { count: balances.accounts }) }}
+                  </span>
                 </p>
                 <p
                   class="mt-1 flex min-h-10 items-center text-3xl font-bold tracking-tight tabular-nums text-gray-900 dark:text-white"
@@ -54,11 +57,11 @@
             <div v-if="balances.items.length" class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span
                 v-for="item in balances.items"
-                :key="item.account_id"
+                :key="item.base_url"
                 class="inline-flex items-center gap-1"
                 :class="item.has_balance ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'"
               >
-                <span class="font-medium">{{ item.name }}:</span>
+                <span class="font-medium">{{ item.base_url }}:</span>
                 <span class="tabular-nums" data-testid="upstream-balance-item">
                   {{ item.has_balance ? `$${(item.balance ?? 0).toFixed(2)}` : t('admin.accounts.upstreamBalances.unknown') }}
                 </span>
@@ -79,8 +82,8 @@
             <table class="w-full text-left text-sm">
               <thead>
                 <tr class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:text-gray-400">
-                  <th class="px-5 py-4 font-medium">{{ t('admin.accounts.table.account') }}</th>
-                  <th class="px-5 py-4 font-medium">{{ t('admin.accounts.table.platform') }}</th>
+                  <th class="px-5 py-4 font-medium">{{ t('admin.accounts.upstreamBalances.upstreamColumn') }}</th>
+                  <th class="px-5 py-4 font-medium">{{ t('admin.accounts.upstreamBalances.accountsColumn') }}</th>
                   <th class="px-5 py-4 font-medium">{{ t('admin.accounts.table.status') }}</th>
                   <th class="px-5 py-4 text-right font-medium">{{ t('admin.accounts.upstreamBalances.balanceColumn') }}</th>
                   <th class="px-5 py-4 font-medium">{{ t('admin.accounts.upstreamBalances.receivedAtTitle') }}</th>
@@ -89,17 +92,19 @@
               <tbody>
                 <tr
                   v-for="item in balances.items"
-                  :key="item.account_id"
+                  :key="item.base_url"
                   class="border-b border-gray-100 last:border-0 dark:border-dark-800"
                 >
-                  <td class="px-5 py-4 font-medium text-gray-900 dark:text-white">{{ item.name }}</td>
-                  <td class="px-5 py-4 text-gray-700 dark:text-gray-300">{{ item.platform }}</td>
+                  <td class="px-5 py-4 font-medium text-gray-900 dark:text-white">{{ item.base_url }}</td>
+                  <td class="px-5 py-4 text-gray-700 dark:text-gray-300">
+                    {{ item.ok_accounts }}/{{ item.accounts }}
+                  </td>
                   <td class="px-5 py-4">
                     <span
                       class="inline-flex items-center gap-1 text-xs"
-                      :class="item.status === 'active' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'"
+                      :class="item.probe_status === 'ok' ? 'text-green-600 dark:text-green-400' : (item.probe_status === 'partial' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400')"
                     >
-                      {{ item.status === 'active' ? t('admin.accounts.status.active') : t('admin.accounts.status.disabled') }}
+                      {{ t(`admin.accounts.upstreamBalances.probe.${item.probe_status || 'unknown'}`) }}
                     </span>
                   </td>
                   <td class="px-5 py-4 text-right tabular-nums" :class="item.has_balance ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
@@ -138,7 +143,7 @@ import type { UpstreamBalancesResponse } from '@/types'
 const { t } = useI18n()
 const appStore = useAppStore()
 
-const balances = ref<UpstreamBalancesResponse>({ items: [], total: 0, has_total: false, probe_failed: 0 })
+const balances = ref<UpstreamBalancesResponse>({ items: [], total: 0, has_total: false, probe_failed: 0, accounts: 0 })
 const loading = ref(false)
 
 const loadBalances = async () => {

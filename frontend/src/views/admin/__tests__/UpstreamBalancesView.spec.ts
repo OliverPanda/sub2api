@@ -43,6 +43,10 @@ const i18n = createI18n({
             receivedAt: 'Updated: {value}',
             balanceColumn: 'Balance',
             receivedAtTitle: 'Updated',
+            upstreamColumn: 'Upstream',
+            accountsColumn: 'Probed/Accounts',
+            accountsCount: '{count} accounts',
+            probe: { ok: 'OK', partial: 'Partial', failed: 'Failed', unsupported: 'Unsupported', unknown: 'Unknown' },
             unknown: 'Unknown'
           },
           table: { account: 'Account', platform: 'Platform', status: 'Status' },
@@ -68,12 +72,13 @@ describe('UpstreamBalancesView', () => {
   beforeEach(() => {
     mocks.getUpstreamBalances.mockReset().mockResolvedValue({
       items: [
-        { account_id: 1, name: 'upstream-a', platform: 'openai', status: 'active', balance: 32.5, has_balance: true, received_at: '2026-10-27T00:00:00Z' },
-        { account_id: 2, name: 'upstream-b', platform: 'openai', status: 'inactive', has_balance: false }
+        { base_url: 'https://upstream-a.example', accounts: 2, ok_accounts: 2, balance: 32.5, has_balance: true, probe_status: 'ok', received_at: '2026-10-27T00:00:00Z' },
+        { base_url: 'https://upstream-b.example', accounts: 1, ok_accounts: 0, has_balance: false, probe_status: 'failed' }
       ],
       total: 32.5,
       has_total: true,
-      probe_failed: 0
+      probe_failed: 1,
+      accounts: 3
     })
   })
 
@@ -85,7 +90,7 @@ describe('UpstreamBalancesView', () => {
     expect(wrapper.get('[data-testid="upstream-balances-total"]').text()).toBe('$32.50')
     const items = wrapper.findAll('[data-testid="upstream-balance-item"]')
     expect(items.map((i) => i.text())).toEqual(['$32.50', 'admin.accounts.upstreamBalances.unknown'])
-    expect(wrapper.text()).toContain('upstream-a')
+    expect(wrapper.text()).toContain('https://upstream-a.example')
     expect(wrapper.text()).toContain('$32.50')
     wrapper.unmount()
   })

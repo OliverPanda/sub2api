@@ -235,6 +235,16 @@ export default {
         receivedAt: '更新于：{value}',
         balanceColumn: '余额',
         receivedAtTitle: '更新时间',
+        upstreamColumn: '上游地址',
+        accountsColumn: '探测/账号',
+        accountsCount: '{count} 个账号',
+        probe: {
+          ok: '正常',
+          partial: '部分正常',
+          failed: '异常',
+          unsupported: '不支持',
+          unknown: '未知'
+        },
         unknown: '未知'
       },
       allPrivacyModes: '全部Privacy状态',
