@@ -1,5 +1,10 @@
 <template>
   <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+    <!-- 固定区域：页面级概览或提示 -->
+    <div v-if="$slots.default" class="layout-section-fixed">
+      <slot />
+    </div>
+
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed">
       <slot name="actions" />
