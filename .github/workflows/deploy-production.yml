@@ -10,6 +10,10 @@ on:
         description: 'Release tag to deploy (default: latest stable release)'
         required: false
         type: string
+      sha:
+        description: 'Git SHA of the release to deploy (required for workflow_dispatch)'
+        required: false
+        type: string
 
 concurrency:
   group: sub2api-production
@@ -20,7 +24,7 @@ permissions:
   packages: read
 
 env:
-  RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
 
 jobs:
   deploy:
