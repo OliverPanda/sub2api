@@ -306,7 +306,7 @@
                 <div class="rounded-xl bg-gray-50 p-3 dark:bg-dark-700/60">
                   <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-dark-400">
                     {{ t('admin.pelicanTests.progress', {
-                      done: selectedRun.results.length,
+                      done: runResults.length,
                       total: resultTarget
                     }) }}
                   </p>
@@ -348,7 +348,7 @@
                   </h3>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {{ t('admin.pelicanTests.resultsSummary', {
-                      done: selectedRun.results.length,
+                      done: runResults.length,
                       total: resultTarget,
                       success: selectedRun.success_count,
                       failed: selectedRun.failed_count
@@ -358,12 +358,12 @@
                 <Select
                   v-model="resultFilter"
                   :options="resultFilterOptions"
-                  :disabled="selectedRun.results.length === 0"
+                  :disabled="runResults.length === 0"
                   class="w-full sm:w-44"
                 />
               </div>
 
-              <div v-if="selectedRun.results.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-14 text-center dark:border-dark-600">
+              <div v-if="runResults.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-14 text-center dark:border-dark-600">
                 <Icon name="chart" size="lg" class="mx-auto text-gray-300 dark:text-dark-500" />
                 <p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.pelicanTests.noResults') }}
@@ -373,7 +373,7 @@
                 </p>
               </div>
 
-              <div v-if="selectedRun.results.length > 0 && filteredResults.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-dark-600">
+              <div v-if="runResults.length > 0 && filteredResults.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-dark-600">
                 <Icon name="chart" size="lg" class="mx-auto text-gray-300 dark:text-dark-500" />
                 <p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.pelicanTests.noFilteredResults') }}
@@ -600,6 +600,8 @@ const resultTarget = computed(() => {
   return Math.max(0, selectedRun.value.total_accounts - selectedRun.value.skipped_count)
 })
 
+const runResults = computed(() => selectedRun.value?.results ?? [])
+
 const resultCounts = computed((): { all: number; success: number; failed: number } => {
   const counts = { all: 0, success: 0, failed: 0 }
   for (const result of selectedRun.value?.results ?? []) {
@@ -625,7 +627,7 @@ const progressPercent = computed(() => {
   if (!selectedRun.value) return 0
   if (selectedRun.value.status === 'completed' && resultTarget.value === 0) return 100
   if (resultTarget.value === 0) return 0
-  return Math.min(100, Math.round((selectedRun.value.results.length / resultTarget.value) * 100))
+  return Math.min(100, Math.round((runResults.value.length / resultTarget.value) * 100))
 })
 
 const previewTitle = computed(() =>

@@ -83,6 +83,9 @@ func (r *pelicanTestRepository) GetRun(ctx context.Context, id int64) (*service.
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if detail.Results == nil {
+		detail.Results = make([]service.PelicanTestResult, 0)
+	}
 	return detail, nil
 }
 
