@@ -728,6 +728,12 @@ func classifyCreatePaymentError(req CreateOrderRequest, providerKey string, err 
 	if err == nil {
 		return nil
 	}
+	if providerKey == payment.TypeEasyPay && isZPayBalanceInsufficientError(err) {
+		return infraerrors.ServiceUnavailable(
+			"ZPAY_BALANCE_INSUFFICIENT",
+			"zpay merchant account balance is insufficient",
+		)
+	}
 	if providerKey == payment.TypeWxpay &&
 		payment.GetBasePaymentType(req.PaymentType) == payment.TypeWxpay &&
 		strings.Contains(err.Error(), "wxpay h5 payments are not authorized for this merchant") {
@@ -739,6 +745,12 @@ func classifyCreatePaymentError(req CreateOrderRequest, providerKey string, err 
 		})
 	}
 	return infraerrors.ServiceUnavailable("PAYMENT_GATEWAY_ERROR", fmt.Sprintf("payment gateway error: %s", err.Error()))
+}
+
+func isZPayBalanceInsufficientError(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "zpay账户余额不足") ||
+		strings.Contains(message, "zpay account balance is insufficient")
 }
 
 func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest, payAmount float64, sel *payment.InstanceSelection, pr *payment.CreatePaymentResponse, resultType payment.CreatePaymentResultType) *CreateOrderResponse {

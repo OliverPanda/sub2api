@@ -678,6 +678,58 @@ export interface ModelAllowlist {
   models: string[]
 }
 
+// ==================== Pelican Test Types ====================
+
+export type PelicanTestRunStatus = 'running' | 'completed' | 'failed'
+export type PelicanTestResultStatus = 'success' | 'failed'
+
+export interface PelicanTestRun {
+  id: number
+  group_id: number | null
+  group_name: string
+  model_id: string
+  prompt: string
+  status: PelicanTestRunStatus
+  total_accounts: number
+  success_count: number
+  failed_count: number
+  skipped_count: number
+  error_message: string
+  created_by: number
+  started_at: string
+  finished_at: string | null
+  created_at: string
+}
+
+export interface PelicanTestResult {
+  id: number
+  run_id: number
+  group_id: number | null
+  account_id: number | null
+  account_name: string
+  platform: string
+  model_id: string
+  status: PelicanTestResultStatus
+  raw_output: string
+  svg_content: string
+  error_message: string
+  latency_ms: number
+  started_at: string
+  finished_at: string
+  created_at: string
+}
+
+export interface PelicanTestRunDetail extends PelicanTestRun {
+  results: PelicanTestResult[]
+}
+
+export interface CreatePelicanTestRunRequest {
+  group_id: number
+  model_id: string
+  account_ids?: number[]
+  prompt?: string
+}
+
 // 固定账号获取 Codex Model Manifest 配置（仅 openai 分组）
 export interface CodexModelsManifestConfig {
   enabled: boolean

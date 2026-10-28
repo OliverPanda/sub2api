@@ -914,6 +914,8 @@ var ProviderSet = wire.NewSet(
 	ProvideRateLimitService,
 	ProvideAccountUsageService,
 	ProvideAccountTestService,
+	wire.Bind(new(PelicanTestAccountRunner), new(*AccountTestService)),
+	NewPelicanTestService,
 	ProvideUpstreamBillingProbeService,
 	ProvideOllamaCloudUsageService,
 	ProvideOpenCodeGoUsageService,

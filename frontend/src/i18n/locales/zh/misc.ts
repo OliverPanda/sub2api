@@ -455,6 +455,8 @@ export default {
       alipayDesktopQrHint: '电脑端支付宝应展示扫码单，请刷新后重试，或确认浏览器未拦截当前支付页。',
       easypayDomainNotAuthorized: '易支付尚未放行当前支付域名。',
       easypayDomainAuthorizationHint: '请在易支付后台确认支付域名授权状态为“正常”后重试；这不是浏览器拦截导致的。',
+      zpayBalanceInsufficient: 'ZPay 商户余额不足，暂时无法发起支付宝支付。',
+      zpayBalanceInsufficientHint: '请让站点管理员为 ZPay 商户账户充值后重试；这不是二维码生成或浏览器问题。',
       alipayMobileUnavailable: '当前页面未成功跳转到支付宝。',
       alipayMobileOpenHint: '请允许当前页面打开支付宝 App，或改用系统浏览器重新发起支付。',
       // Structured error codes (reason strings from backend ApplicationError)
@@ -469,6 +471,7 @@ export default {
       TOO_MANY_PENDING: '待支付订单过多（最多 {max} 个），请先完成或取消现有订单',
       DAILY_LIMIT_EXCEEDED: '今日充值已达上限，剩余额度 {remaining}',
       PAYMENT_GATEWAY_ERROR: '支付方式不可用',
+      ZPAY_BALANCE_INSUFFICIENT: 'ZPay 商户余额不足，暂时无法发起支付宝支付',
       NO_AVAILABLE_INSTANCE: '暂无可用的支付通道',
       PAYMENT_PROVIDER_MISCONFIGURED: '支付通道配置错误，请联系管理员',
       WXPAY_CONFIG_MISSING_KEY: '微信支付配置缺少必填项：{key}',

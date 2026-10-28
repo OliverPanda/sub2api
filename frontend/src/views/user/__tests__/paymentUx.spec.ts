@@ -58,13 +58,43 @@ describe('describePaymentScenarioError', () => {
     })
   })
 
-  it('maps generic desktop Alipay failures to QR guidance', () => {
+  it('maps an unhandled desktop Alipay response to QR guidance', () => {
     expect(describePaymentScenarioError(
-      { reason: 'PAYMENT_GATEWAY_ERROR' },
+      { reason: 'UNHANDLED_PAYMENT_SCENARIO' },
       { paymentMethod: 'alipay', isMobile: false, isWechatBrowser: false },
     )).toEqual({
       messageKey: 'payment.errors.alipayDesktopUnavailable',
       hintKey: 'payment.errors.alipayDesktopQrHint',
+    })
+  })
+
+  it('does not present a gateway error as a QR-rendering failure', () => {
+    expect(describePaymentScenarioError(
+      { reason: 'PAYMENT_GATEWAY_ERROR', message: 'payment gateway error: upstream request rejected' },
+      { paymentMethod: 'alipay', isMobile: false, isWechatBrowser: false },
+    )).toBeNull()
+  })
+
+  it('surfaces the ZPay merchant balance problem instead of QR guidance', () => {
+    expect(describePaymentScenarioError(
+      { reason: 'ZPAY_BALANCE_INSUFFICIENT' },
+      { paymentMethod: 'alipay', isMobile: false, isWechatBrowser: false },
+    )).toEqual({
+      messageKey: 'payment.errors.zpayBalanceInsufficient',
+      hintKey: 'payment.errors.zpayBalanceInsufficientHint',
+    })
+  })
+
+  it('recognizes an older ZPay balance error by its gateway message', () => {
+    expect(describePaymentScenarioError(
+      {
+        reason: 'PAYMENT_GATEWAY_ERROR',
+        message: 'payment gateway error: easypay error: ZPAY账户余额不足，无法发起支付，请提前充值余额，抵扣手续费使用。',
+      },
+      { paymentMethod: 'alipay', isMobile: false, isWechatBrowser: false },
+    )).toEqual({
+      messageKey: 'payment.errors.zpayBalanceInsufficient',
+      hintKey: 'payment.errors.zpayBalanceInsufficientHint',
     })
   })
 

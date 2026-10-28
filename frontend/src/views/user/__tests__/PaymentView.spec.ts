@@ -375,6 +375,31 @@ describe('PaymentView subscription plan grid', () => {
 })
 
 describe('PaymentView recharge rate preview', () => {
+  it('does not render the redundant account and automatic recharge cards', async () => {
+    routeState.path = '/purchase'
+    routeState.query = {}
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      methods: {
+        alipay: checkoutInfoFixture().data.methods.wxpay,
+      },
+    }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('payment.rechargeAccount')
+    expect(wrapper.text()).not.toContain('payment.autoRecharge.title')
+  })
+
   it('passes the configured recharge tiers to the amount input', async () => {
     routeState.path = '/purchase'
     routeState.query = {}
@@ -866,7 +891,7 @@ describe('PaymentView subscription feature flag', () => {
 
     expect(tabLabels(wrapper)).toEqual([])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
-    expect(wrapper.text()).toContain('payment.rechargeAccount')
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(true)
   })
 
   it('shows an unavailable notice instead of a doomed top-up form when balance recharge is disabled too', async () => {
@@ -876,7 +901,7 @@ describe('PaymentView subscription feature flag', () => {
     expect(tabLabels(wrapper)).toEqual([])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
     expect(wrapper.text()).not.toContain('payment.confirmSubscription')
-    expect(wrapper.text()).not.toContain('payment.rechargeAccount')
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(false)
     expect(wrapper.text()).toContain('payment.billingUnavailable')
     wrapper.unmount()
   })
@@ -890,7 +915,7 @@ describe('PaymentView subscription feature flag', () => {
 
     expect(tabLabels(wrapper)).toEqual([])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
-    expect(wrapper.text()).toContain('payment.rechargeAccount')
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -903,7 +928,7 @@ describe('PaymentView subscription feature flag', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('payment.billingUnavailable')
-    expect(wrapper.text()).not.toContain('payment.rechargeAccount')
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(false)
     expect(wrapper.findAllComponents(SubscriptionPlanCard).length).toBeGreaterThan(0)
     wrapper.unmount()
   })

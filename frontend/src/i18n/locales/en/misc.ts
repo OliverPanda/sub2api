@@ -431,6 +431,8 @@ export default {
       alipayDesktopQrHint: 'Desktop Alipay should render a QR code. Refresh and retry, or make sure the payment page was not blocked.',
       easypayDomainNotAuthorized: 'EasyPay has not authorized the current payment domain yet.',
       easypayDomainAuthorizationHint: 'Confirm that the payment domain is approved in the EasyPay dashboard and retry. Browser blocking is not the cause.',
+      zpayBalanceInsufficient: 'The ZPay merchant balance is insufficient, so Alipay payment cannot be started.',
+      zpayBalanceInsufficientHint: 'Ask the site administrator to top up the ZPay merchant account and retry. This is not a QR-code or browser issue.',
       alipayMobileUnavailable: 'This page could not hand off to Alipay.',
       alipayMobileOpenHint: 'Allow the current page to open the Alipay app, or retry from the system browser.',
       // Structured error codes (reason strings from backend ApplicationError)
@@ -445,6 +447,7 @@ export default {
       TOO_MANY_PENDING: 'Too many pending orders (max {max}). Please complete or cancel existing orders first.',
       DAILY_LIMIT_EXCEEDED: 'Daily recharge limit reached. Remaining: {remaining}.',
       PAYMENT_GATEWAY_ERROR: 'Payment method is unavailable.',
+      ZPAY_BALANCE_INSUFFICIENT: 'The ZPay merchant balance is insufficient, so Alipay payment cannot be started.',
       NO_AVAILABLE_INSTANCE: 'No payment channel available right now.',
       PAYMENT_PROVIDER_MISCONFIGURED: 'Payment provider misconfigured. Please contact an administrator.',
       WXPAY_CONFIG_MISSING_KEY: 'WeChat Pay config missing required key: {key}.',

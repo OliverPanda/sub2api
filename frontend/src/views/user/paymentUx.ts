@@ -50,6 +50,11 @@ function isEasyPayDomainAuthorizationError(normalizedMessage: string): boolean {
     || normalizedMessage.includes('payment domain is not authorized')
 }
 
+function isZPayMerchantBalanceInsufficient(normalizedMessage: string): boolean {
+  return normalizedMessage.includes('zpay账户余额不足')
+    || normalizedMessage.includes('zpay account balance is insufficient')
+}
+
 export function describePaymentScenarioError(
   error: unknown,
   context: PaymentScenarioContext,
@@ -114,7 +119,20 @@ export function describePaymentScenarioError(
     }
   }
 
-  if (method === 'alipay' && (code === 'PAYMENT_GATEWAY_ERROR' || code === 'UNHANDLED_PAYMENT_SCENARIO')) {
+  if (
+    method === 'alipay'
+    && (code === 'ZPAY_BALANCE_INSUFFICIENT' || isZPayMerchantBalanceInsufficient(normalizedMessage))
+  ) {
+    return {
+      messageKey: 'payment.errors.zpayBalanceInsufficient',
+      hintKey: 'payment.errors.zpayBalanceInsufficientHint',
+    }
+  }
+
+  // A gateway error can come from the upstream merchant account or API call and
+  // must not be presented as a QR-rendering problem. Only an actually unhandled
+  // payment response should receive device-specific QR guidance.
+  if (method === 'alipay' && code === 'UNHANDLED_PAYMENT_SCENARIO') {
     return {
       messageKey: context.isMobile
         ? 'payment.errors.alipayMobileUnavailable'
