@@ -710,8 +710,9 @@ export interface PelicanTestResult {
   platform: string
   model_id: string
   status: PelicanTestResultStatus
-  raw_output: string
-  svg_content: string
+  raw_output?: string
+  svg_content?: string
+  image_url?: string
   error_message: string
   latency_ms: number
   started_at: string

@@ -405,6 +405,29 @@
                       </span>
                     </button>
 
+                    <a
+                      v-else-if="result.image_url"
+                      :href="result.image_url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="group relative block w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 dark:border-dark-600 dark:bg-dark-900"
+                      :title="t('admin.pelicanTests.preview')"
+                      :aria-label="t('admin.pelicanTests.previewTitle', { account: result.account_name })"
+                    >
+                      <img
+                        :src="result.image_url"
+                        :alt="t('admin.pelicanTests.previewTitle', { account: result.account_name })"
+                        class="h-56 w-full bg-white object-contain"
+                        referrerpolicy="no-referrer"
+                      >
+                      <span class="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-gray-950/50 via-transparent to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        <span class="inline-flex items-center gap-1 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm dark:bg-dark-800/95 dark:text-gray-200">
+                          <Icon name="eye" size="sm" />
+                          {{ t('admin.pelicanTests.preview') }}
+                        </span>
+                      </span>
+                    </a>
+
                     <div
                       v-else
                       class="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50/60 px-4 text-center dark:border-red-800/50 dark:bg-red-900/10"
@@ -416,7 +439,7 @@
                     </div>
 
                     <p
-                      v-if="result.error_message && safeSvg(result)"
+                      v-if="result.error_message && resultMedia(result)"
                       class="mt-3 break-words rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-700 dark:bg-red-900/20 dark:text-red-300"
                     >
                       <span class="font-semibold">{{ t('admin.pelicanTests.resultError') }}:</span>
@@ -452,6 +475,13 @@
         referrerpolicy="no-referrer"
         class="h-[70vh] min-h-[420px] w-full rounded-xl bg-white"
       ></iframe>
+      <img
+        v-else-if="previewResult?.image_url"
+        :src="previewResult.image_url"
+        :alt="previewTitle"
+        class="h-[70vh] min-h-[420px] w-full rounded-xl bg-white object-contain"
+        referrerpolicy="no-referrer"
+      >
       <div v-else class="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
         {{ t('admin.pelicanTests.noPreview') }}
       </div>
@@ -565,6 +595,9 @@ const previewSvg = computed(() =>
   previewResult.value ? safeSvg(previewResult.value) : ''
 )
 
+const resultMedia = (result: PelicanTestResult) =>
+  Boolean(result.image_url || safeSvg(result))
+
 const deleteMessage = computed(() => {
   const run = pendingDelete.value
   return run
@@ -595,7 +628,7 @@ const safeSvg = (result: PelicanTestResult) => {
   if (cached !== undefined) return cached
   let sanitized = ''
   try {
-    sanitized = sanitizeSvg(result.svg_content)
+    sanitized = sanitizeSvg(result.svg_content ?? '')
   } catch (error) {
     console.error('Failed to sanitize pelican test SVG:', error)
   }
@@ -771,7 +804,7 @@ const confirmDelete = async () => {
 }
 
 const openPreview = (result: PelicanTestResult) => {
-  if (!safeSvg(result)) return
+  if (!resultMedia(result)) return
   previewResult.value = result
 }
 

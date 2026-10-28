@@ -66,8 +66,8 @@ const runSummary = {
   model_id: 'claude-sonnet-4-6',
   prompt: 'Draw a pelican.',
   status: 'completed' as const,
-  total_accounts: 1,
-  success_count: 1,
+  total_accounts: 2,
+  success_count: 2,
   failed_count: 0,
   skipped_count: 0,
   error_message: '',
@@ -96,6 +96,22 @@ const runDetail = {
       started_at: '2026-10-27T00:00:00Z',
       finished_at: '2026-10-27T00:00:01Z',
       created_at: '2026-10-27T00:00:01Z'
+    },
+    {
+      id: 9,
+      run_id: 12,
+      group_id: 1,
+      account_id: 5,
+      account_name: 'Image Account',
+      platform: 'openai',
+      model_id: 'gpt-image-2',
+      status: 'success' as const,
+      image_url: 'data:image/png;base64,iVBORw0KGgo=',
+      error_message: '',
+      latency_ms: 2345,
+      started_at: '2026-10-27T00:00:02Z',
+      finished_at: '2026-10-27T00:00:03Z',
+      created_at: '2026-10-27T00:00:03Z'
     }
   ]
 }
@@ -155,7 +171,9 @@ describe('PelicanTestsView', () => {
     expect(wrapper.text()).toContain('Core Anthropic')
     expect(wrapper.text()).toContain('Primary Account')
     expect(wrapper.text()).toContain('1.23 s')
+    expect(wrapper.text()).toContain('Image Account')
     expect(wrapper.find('iframe').exists()).toBe(true)
+    expect(wrapper.find('img').exists()).toBe(true)
 
     wrapper.unmount()
   })

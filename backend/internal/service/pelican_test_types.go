@@ -46,8 +46,9 @@ type PelicanTestResult struct {
 	Platform     string    `json:"platform"`
 	ModelID      string    `json:"model_id"`
 	Status       string    `json:"status"`
-	RawOutput    string    `json:"raw_output"`
-	SVGContent   string    `json:"svg_content"`
+	RawOutput    string    `json:"raw_output,omitempty"`
+	SVGContent   string    `json:"svg_content,omitempty"`
+	ImageURL     string    `json:"image_url,omitempty"`
 	ErrorMessage string    `json:"error_message"`
 	LatencyMS    int64     `json:"latency_ms"`
 	StartedAt    time.Time `json:"started_at"`

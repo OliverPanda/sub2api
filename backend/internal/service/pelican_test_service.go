@@ -571,6 +571,7 @@ func (s *PelicanTestService) runOneAccount(ctx context.Context, run *PelicanTest
 	testResult, testErr := s.accountTestSvc.RunAccountTestBackground(ctx, account.ID, run.ModelID, run.Prompt)
 	if testResult != nil {
 		result.RawOutput = testResult.ResponseText
+		result.ImageURL = testResult.ImageURL
 		result.ErrorMessage = testResult.ErrorMessage
 		if testResult.Status == PelicanTestResultSuccess {
 			result.Status = PelicanTestResultSuccess
@@ -585,11 +586,15 @@ func (s *PelicanTestService) runOneAccount(ctx context.Context, run *PelicanTest
 
 	if result.Status == PelicanTestResultSuccess {
 		svg, svgErr := ExtractPelicanSVG(result.RawOutput)
-		if svgErr != nil {
+		if svgErr == nil {
+			result.SVGContent = svg
+		} else if strings.TrimSpace(result.ImageURL) != "" {
+			// Image-generation models cannot return an SVG document. Keep the
+			// generated media so a successful account probe still has a visual.
+			result.ErrorMessage = ""
+		} else {
 			result.Status = PelicanTestResultFailed
 			result.ErrorMessage = svgErr.Error()
-		} else {
-			result.SVGContent = svg
 		}
 	}
 	if result.Status == PelicanTestResultFailed && result.ErrorMessage == "" {

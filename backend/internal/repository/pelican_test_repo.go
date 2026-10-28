@@ -56,7 +56,7 @@ func (r *pelicanTestRepository) GetRun(ctx context.Context, id int64) (*service.
 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, run_id, group_id, account_id, account_name, platform, model_id,
-			status, raw_output, svg_content, error_message, latency_ms,
+			status, raw_output, svg_content, image_url, error_message, latency_ms,
 			started_at, finished_at, created_at
 		FROM pelican_test_results
 		WHERE run_id = $1
@@ -73,7 +73,7 @@ func (r *pelicanTestRepository) GetRun(ctx context.Context, id int64) (*service.
 		if err := rows.Scan(
 			&result.ID, &result.RunID, &result.GroupID, &result.AccountID,
 			&result.AccountName, &result.Platform, &result.ModelID, &result.Status,
-			&result.RawOutput, &result.SVGContent, &result.ErrorMessage, &result.LatencyMS,
+			&result.RawOutput, &result.SVGContent, &result.ImageURL, &result.ErrorMessage, &result.LatencyMS,
 			&result.StartedAt, &result.FinishedAt, &result.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -139,23 +139,23 @@ func (r *pelicanTestRepository) CreateResultAndIncrement(ctx context.Context, re
 	row := tx.QueryRowContext(ctx, `
 		INSERT INTO pelican_test_results (
 			run_id, group_id, account_id, account_name, platform, model_id, status,
-			raw_output, svg_content, error_message, latency_ms,
+			raw_output, svg_content, image_url, error_message, latency_ms,
 			started_at, finished_at, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
 		ON CONFLICT (run_id, account_id) WHERE account_id IS NOT NULL DO NOTHING
 		RETURNING id, run_id, group_id, account_id, account_name, platform, model_id,
-			status, raw_output, svg_content, error_message, latency_ms,
+			status, raw_output, svg_content, image_url, error_message, latency_ms,
 			started_at, finished_at, created_at
 	`, result.RunID, result.GroupID, result.AccountID, result.AccountName, result.Platform,
 		result.ModelID, result.Status, result.RawOutput, result.SVGContent,
-		result.ErrorMessage, result.LatencyMS, result.StartedAt, result.FinishedAt)
+		result.ImageURL, result.ErrorMessage, result.LatencyMS, result.StartedAt, result.FinishedAt)
 
 	stored, err := scanPelicanTestResult(row)
 	inserted := err == nil
 	if errors.Is(err, sql.ErrNoRows) {
 		row = tx.QueryRowContext(ctx, `
 			SELECT id, run_id, group_id, account_id, account_name, platform, model_id,
-				status, raw_output, svg_content, error_message, latency_ms,
+				status, raw_output, svg_content, image_url, error_message, latency_ms,
 				started_at, finished_at, created_at
 			FROM pelican_test_results
 			WHERE run_id = $1 AND account_id = $2
@@ -246,7 +246,7 @@ func scanPelicanTestResult(row pelicanRunScanner) (*service.PelicanTestResult, e
 	if err := row.Scan(
 		&result.ID, &result.RunID, &result.GroupID, &result.AccountID,
 		&result.AccountName, &result.Platform, &result.ModelID, &result.Status,
-		&result.RawOutput, &result.SVGContent, &result.ErrorMessage, &result.LatencyMS,
+		&result.RawOutput, &result.SVGContent, &result.ImageURL, &result.ErrorMessage, &result.LatencyMS,
 		&result.StartedAt, &result.FinishedAt, &result.CreatedAt,
 	); err != nil {
 		return nil, err

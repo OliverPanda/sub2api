@@ -3353,7 +3353,7 @@ func (s *AccountTestService) RunAccountTestBackground(ctx context.Context, accou
 
 	finishedAt := time.Now()
 	body := w.Body.String()
-	responseText, errMsg := parseTestSSEOutput(body)
+	responseText, errMsg, imageURL := parseTestSSEOutput(body)
 
 	status := "success"
 	if testErr != nil || errMsg != "" {
@@ -3367,14 +3367,16 @@ func (s *AccountTestService) RunAccountTestBackground(ctx context.Context, accou
 		Status:       status,
 		ResponseText: responseText,
 		ErrorMessage: errMsg,
+		ImageURL:     imageURL,
 		LatencyMs:    finishedAt.Sub(startedAt).Milliseconds(),
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
 	}, nil
 }
 
-// parseTestSSEOutput extracts response text and error message from captured SSE output.
-func parseTestSSEOutput(body string) (responseText, errMsg string) {
+// parseTestSSEOutput extracts response text, generated media and error message
+// from captured SSE output. Generated images are returned as data or https URLs.
+func parseTestSSEOutput(body string) (responseText, errMsg, imageURL string) {
 	var texts []string
 	for _, line := range strings.Split(body, "\n") {
 		line = strings.TrimSpace(line)
@@ -3390,6 +3392,10 @@ func parseTestSSEOutput(body string) (responseText, errMsg string) {
 		case "content":
 			if event.Text != "" {
 				texts = append(texts, event.Text)
+			}
+		case "image":
+			if imageURL == "" && event.ImageURL != "" {
+				imageURL = event.ImageURL
 			}
 		case "error":
 			errMsg = event.Error

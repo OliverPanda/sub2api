@@ -140,6 +140,27 @@ func TestBuildGrokTestProbeBody(t *testing.T) {
 	require.JSONEq(t, string(quotaBody), string(legacyBody))
 }
 
+func TestPelicanTestRunOneAccountKeepsGeneratedImage(t *testing.T) {
+	t.Parallel()
+
+	const pngURL = "data:image/png;base64,iVBORw0KGgo="
+	repo := &pelicanTestRepoStub{}
+	tester := &pelicanTestImageRunnerStub{result: &ScheduledTestResult{
+		Status:       PelicanTestResultSuccess,
+		ResponseText: "",
+		ImageURL:     pngURL,
+	}}
+	svc := &PelicanTestService{repo: repo, accountTestSvc: tester}
+
+	run := &PelicanTestRun{ID: 21, ModelID: "gpt-image-2"}
+	result := svc.runOneAccount(context.Background(), run, Account{ID: 31, Name: "image-account", Platform: "openai"})
+
+	require.Equal(t, PelicanTestResultSuccess, result.Status)
+	require.Equal(t, pngURL, result.ImageURL)
+	require.Empty(t, result.SVGContent)
+	require.Empty(t, result.ErrorMessage)
+}
+
 func TestPelicanTestServiceDeleteRunRejectsRunningBatch(t *testing.T) {
 	t.Parallel()
 
@@ -283,6 +304,17 @@ func TestPelicanTestServiceStopsRunWhenLeaseIsLost(t *testing.T) {
 	defer cancel()
 	require.NoError(t, svc.Stop(stopCtx))
 }
+
+type pelicanTestImageRunnerStub struct {
+	result *ScheduledTestResult
+	err    error
+}
+
+func (r *pelicanTestImageRunnerStub) RunAccountTestBackground(context.Context, int64, string, string) (*ScheduledTestResult, error) {
+	return r.result, r.err
+}
+
+var _ PelicanTestAccountRunner = (*pelicanTestImageRunnerStub)(nil)
 
 type pelicanTestRepoStub struct {
 	mu                     sync.Mutex

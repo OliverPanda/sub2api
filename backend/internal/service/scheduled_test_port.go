@@ -26,6 +26,7 @@ type ScheduledTestResult struct {
 	PlanID       int64     `json:"plan_id"`
 	Status       string    `json:"status"`
 	ResponseText string    `json:"response_text"`
+	ImageURL     string    `json:"image_url,omitempty"`
 	ErrorMessage string    `json:"error_message"`
 	LatencyMs    int64     `json:"latency_ms"`
 	StartedAt    time.Time `json:"started_at"`
