@@ -51,6 +51,13 @@ export default {
     batchError: '批次错误',
     testPrompt: '本次提示词',
     resultsTitle: '账号结果',
+    resultsSummary: '已返回 {done}/{total} · {success} 成功 · {failed} 失败',
+    filters: {
+      all: '全部（{count}）',
+      success: '成功（{count}）',
+      failed: '失败（{count}）'
+    },
+    noFilteredResults: '当前筛选条件下没有账号结果。',
     noResults: '暂无账号结果',
     noResultsHint: '结果会在各账号测试完成后陆续出现。',
     latency: '耗时',

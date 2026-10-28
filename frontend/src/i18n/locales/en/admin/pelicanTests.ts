@@ -51,6 +51,13 @@ export default {
     batchError: 'Batch error',
     testPrompt: 'Prompt',
     resultsTitle: 'Account Results',
+    resultsSummary: 'Returned {done}/{total} · {success} passed · {failed} failed',
+    filters: {
+      all: 'All ({count})',
+      success: 'Passed ({count})',
+      failed: 'Failed ({count})'
+    },
+    noFilteredResults: 'No account results match this filter.',
     noResults: 'No account results yet',
     noResultsHint: 'Results will appear as each account finishes.',
     latency: 'Latency',

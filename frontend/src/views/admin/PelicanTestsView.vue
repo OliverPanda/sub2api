@@ -341,13 +341,26 @@
             </div>
 
             <div class="p-5 sm:p-6">
-              <div class="mb-4 flex items-center justify-between gap-3">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                  {{ t('admin.pelicanTests.resultsTitle') }}
-                </h3>
-                <span class="badge badge-gray">
-                  {{ selectedRun.results.length }} / {{ resultTarget }}
-                </span>
+              <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                    {{ t('admin.pelicanTests.resultsTitle') }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.pelicanTests.resultsSummary', {
+                      done: selectedRun.results.length,
+                      total: resultTarget,
+                      success: selectedRun.success_count,
+                      failed: selectedRun.failed_count
+                    }) }}
+                  </p>
+                </div>
+                <Select
+                  v-model="resultFilter"
+                  :options="resultFilterOptions"
+                  :disabled="selectedRun.results.length === 0"
+                  class="w-full sm:w-44"
+                />
               </div>
 
               <div v-if="selectedRun.results.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-14 text-center dark:border-dark-600">
@@ -360,9 +373,16 @@
                 </p>
               </div>
 
+              <div v-if="selectedRun.results.length > 0 && filteredResults.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-dark-600">
+                <Icon name="chart" size="lg" class="mx-auto text-gray-300 dark:text-dark-500" />
+                <p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.pelicanTests.noFilteredResults') }}
+                </p>
+              </div>
+
               <div v-else class="grid gap-4 2xl:grid-cols-2">
                 <article
-                  v-for="result in selectedRun.results"
+                  v-for="result in filteredResults"
                   :key="result.id"
                   class="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800"
                 >
@@ -541,6 +561,8 @@ const selectedRunID = ref<number | null>(null)
 const selectedRun = ref<PelicanTestRunDetail | null>(null)
 const detailLoading = ref(false)
 
+const resultFilter = ref<'all' | PelicanTestResultStatus>('all')
+
 const deleteDialog = ref(false)
 const pendingDelete = ref<PelicanTestRun | null>(null)
 const deleting = ref(false)
@@ -576,6 +598,27 @@ const canStart = computed(() =>
 const resultTarget = computed(() => {
   if (!selectedRun.value) return 0
   return Math.max(0, selectedRun.value.total_accounts - selectedRun.value.skipped_count)
+})
+
+const resultCounts = computed((): { all: number; success: number; failed: number } => {
+  const counts = { all: 0, success: 0, failed: 0 }
+  for (const result of selectedRun.value?.results ?? []) {
+    counts.all += 1
+    counts[result.status] += 1
+  }
+  return counts
+})
+
+const resultFilterOptions = computed(() => ([
+  { value: 'all', label: t('admin.pelicanTests.filters.all', { count: resultCounts.value.all }) },
+  { value: 'success', label: t('admin.pelicanTests.filters.success', { count: resultCounts.value.success }) },
+  { value: 'failed', label: t('admin.pelicanTests.filters.failed', { count: resultCounts.value.failed }) }
+]))
+
+const filteredResults = computed(() => {
+  const results = selectedRun.value?.results ?? []
+  if (resultFilter.value === 'all') return results
+  return results.filter((result) => result.status === resultFilter.value)
 })
 
 const progressPercent = computed(() => {
@@ -738,6 +781,7 @@ const pollSelectedRun = async () => {
 const syncPolling = () => {
   stopPolling()
   if (selectedRun.value?.status === 'running') {
+    resultFilter.value = 'all'
     pollingTimer = setInterval(() => {
       void pollSelectedRun()
     }, 2000)
