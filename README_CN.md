@@ -748,6 +748,32 @@ OAuth / Setup Token 图片请求使用 Responses 主控模型调用 `image_gener
 
 升级后，无模型限制的账号自动支持新模型。已有显式账号映射或分组白名单需要加入两个 2.5 模型（日期快照按需加入）；升级不会自动扩大管理员设置的模型权限。新模型内置价格包含官方文本输入、图片输入和图片输出 token 费率，远端价格表尚未更新时使用内置 2.5 价格；实际按次或按 token 计费仍由既有分组/渠道配置决定。
 
+## 生产发布流程（零按钮）
+
+生产环境完成一次性初始化后（见 [deploy/ops/production/README.md](deploy/ops/production/README.md)），后续每次发布全自动：
+
+```bash
+git checkout main
+git pull origin main
+git tag -a v0.2.19 -m "release v0.2.19"
+git push origin main v0.2.19
+```
+
+只需这一条 `git push`，后续链路自动完成：
+
+1. **Release 工作流**构建前端与多平台 Go 二进制，构建并推送 GHCR 多架构镜像，发布 GitHub Release。
+2. Release 成功后 **Deploy Production 工作流**自动触发：校验 release gate、解析不可变镜像 digest、同步 Cloudflare DNS/TLS、加入 Tailscale 并通过 SSH 连入生产服务器。
+3. 服务器自动备份 PostgreSQL、按 digest 拉取镜像、重建容器、等待健康检查，并执行公网冒烟测试。
+4. 失败时自动回滚上一版镜像；成功后约一分钟内上线。
+
+无需点击任何按钮，无需 SSH，无需人工审批。可在 [Actions](https://github.com/OliverPanda/sub2api/actions) 页面查看进度。
+
+部署失败时可直接在 Actions 页面重跑 **Deploy Production**（Run workflow → 填 tag 名），不需要重新打 tag。
+
+完整流水线、服务器初始化、Cloudflare/Tailscale 配置、Secrets、回滚机制等细节见 [deploy/ops/production/README.md](deploy/ops/production/README.md)。
+
+---
+
 ## 简易模式
 
 简易模式适合个人开发者或内部团队快速使用，不依赖完整 SaaS 功能。

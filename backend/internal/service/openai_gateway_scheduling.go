@@ -92,11 +92,11 @@ func openAIRequestPayloadView(body []byte) gjson.Result {
 // Grok group. This keeps an unrelated x-grok-conv-id header from changing
 // scheduling or upstream session behavior for non-Grok groups.
 //
-// For Grok groups only, previous_response_id is a last-resort sticky seed so
-// multi-turn Responses chains stay on the same OAuth account when no explicit
-// session/conversation/prompt_cache_key is present. Non-Grok groups omit this
-// so HTTP OpenAI paths that delete previous_response_id before upstream are
-// unchanged.
+// For WebSocket Responses requests, previous_response_id is a last-resort
+// sticky seed so multi-turn chains stay on the same upstream account when no
+// explicit session/conversation/prompt_cache_key is present. HTTP OAuth paths
+// still cannot use previous_response_id upstream, so they are deliberately
+// excluded from this fallback.
 func explicitOpenAIRequestSessionID(c *gin.Context, body []byte) string {
 	if c == nil {
 		return ""
@@ -109,8 +109,16 @@ func explicitOpenAIRequestSessionID(c *gin.Context, body []byte) string {
 	if sessionID == "" && len(body) > 0 {
 		sessionID = strings.TrimSpace(openAIRequestPayloadView(body).Get("prompt_cache_key").String())
 	}
-	if sessionID == "" && isGrokRequestContext(c) && len(body) > 0 {
-		sessionID = grokPreviousResponseSessionSeed(body)
+	if sessionID == "" && len(body) > 0 {
+		previousID := strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())
+		if GetOpenAIClientTransport(c) == OpenAIClientTransportWS &&
+			ClassifyOpenAIPreviousResponseIDKind(previousID) == OpenAIPreviousResponseIDKindResponseID {
+			if isGrokRequestContext(c) {
+				sessionID = grokPreviousResponseSessionSeed(body)
+			} else {
+				sessionID = "openai-prev-resp:" + previousID
+			}
+		}
 	}
 	return sessionID
 }

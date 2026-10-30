@@ -182,6 +182,8 @@ export default {
     modelPlaza: 'Model Plaza',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
+    upstreamBalances: 'Upstream Balances',
+    pelicanTests: 'Pelican Tests',
     plugins: 'Plugins',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',

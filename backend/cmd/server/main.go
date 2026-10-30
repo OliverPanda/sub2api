@@ -153,6 +153,11 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	if app.PelicanTest != nil {
+		if err := app.PelicanTest.Start(context.Background()); err != nil {
+			log.Fatalf("Failed to start pelican test service: %v", err)
+		}
+	}
 	if app.PluginManager != nil {
 		if err := app.PluginManager.Start(context.Background()); err != nil {
 			log.Printf("Plugin manager started in degraded state: %v", err)

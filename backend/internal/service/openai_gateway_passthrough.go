@@ -2073,6 +2073,11 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				}
 			}
 			eventType := effectiveOpenAISSEEventType(dataBytes, rawEventType)
+			if normalized, changed := normalizeOpenAIIncompleteEvent(dataBytes, eventType); changed {
+				dataBytes = normalized
+				trimmedData = strings.TrimSpace(string(normalized))
+				line = "data: " + string(normalized)
+			}
 			createdAtTracker.Observe(dataBytes, eventType)
 			if codexFailureTerminal && sawBareError && !sawResponseFailed && eventType != "response.failed" {
 				suppressCurrentEvent = true

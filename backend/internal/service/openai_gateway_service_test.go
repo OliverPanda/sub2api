@@ -727,6 +727,30 @@ func TestOpenAIGatewayService_GenerateSessionHash_EmptyBodyStillEmpty(t *testing
 	require.Empty(t, svc.GenerateSessionHash(c, nil))
 }
 
+func TestOpenAIGatewayService_GenerateSessionHash_WebSocketPreviousResponseID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/openai/v1/responses", nil)
+	SetOpenAIClientTransport(c, OpenAIClientTransportWS)
+
+	svc := &OpenAIGatewayService{}
+	first := []byte(`{"model":"gpt-5.4","input":[{"role":"user","content":"first"}]}`)
+	second := []byte(`{"model":"gpt-5.4","input":[{"role":"user","content":"follow up"}],"previous_response_id":"resp_abc123"}`)
+	third := []byte(`{"model":"gpt-5.4","input":[{"role":"user","content":"another"}],"previous_response_id":"resp_abc123"}`)
+
+	firstHash := svc.GenerateSessionHash(c, first)
+	secondHash := svc.GenerateSessionHash(c, second)
+	thirdHash := svc.GenerateSessionHash(c, third)
+	require.NotEmpty(t, firstHash)
+	require.Equal(t, secondHash, thirdHash, "the continuation anchor must keep WS turns on one account")
+
+	cHTTP, _ := gin.CreateTestContext(httptest.NewRecorder())
+	cHTTP.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
+	SetOpenAIClientTransport(cHTTP, OpenAIClientTransportHTTP)
+	require.NotEqual(t, secondHash, svc.GenerateSessionHash(cHTTP, second), "HTTP must not use previous_response_id as sticky fallback")
+}
+
 func (c stubConcurrencyCache) GetAccountWaitingCount(ctx context.Context, accountID int64) (int, error) {
 	if c.waitCounts != nil {
 		if count, ok := c.waitCounts[accountID]; ok {

@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+import json
+import sys
+
+
+def fail(message: str) -> None:
+    print(message, file=sys.stderr)
+    return_code = 1
+    raise SystemExit(return_code)
+
+
+args = sys.argv[1:]
+try:
+    extract_index = args.index("-extract")
+    key_path = args[extract_index + 1]
+    output_format = args[extract_index + 2]
+except (ValueError, IndexError):
+    fail("fake plutil only supports -extract KEY_PATH raw|json")
+
+try:
+    value = json.load(sys.stdin)
+    for component in key_path.split("."):
+        if isinstance(value, list):
+            value = value[int(component)]
+        else:
+            value = value[component]
+except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
+    fail(f"unable to extract {key_path}: {error}")
+
+if output_format == "json":
+    print(json.dumps(value, separators=(",", ":")))
+elif output_format == "raw":
+    if isinstance(value, bool):
+        print("true" if value else "false")
+    elif value is None:
+        print()
+    else:
+        print(value)
+else:
+    fail(f"unsupported output format: {output_format}")

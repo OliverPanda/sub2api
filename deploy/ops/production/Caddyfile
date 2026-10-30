@@ -1,0 +1,96 @@
+{
+	auto_https off
+	admin off
+	persist_config off
+	servers {
+		max_header_size 64KB
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+		# Generated from Cloudflare's published IPv4/IPv6 egress ranges.
+		# Refresh with scripts/refresh-cloudflare-trusted-proxies.sh.
+		import /etc/caddy/cloudflare-trusted-proxies.caddy
+	}
+}
+
+(proxy_headers) {
+	# Caddy only trusts CF-Connecting-IP when the TCP peer is in the
+	# Cloudflare ranges imported above. Origin firewall rules should also
+	# allow 443 only from those ranges.
+	header_up X-Real-IP {client_ip}
+	header_up X-Forwarded-For {client_ip}
+	header_up X-Forwarded-Proto https
+	header_up X-Forwarded-Host {host}
+	header_up -CF-Connecting-IP
+}
+
+{$PUBLIC_DOMAIN:api.xddapi.org.uk} {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key {
+		protocols tls1.2 tls1.3
+	}
+
+	# Legacy bookmarks move to Sub2API's native payment page. The old
+	# Bridge/Dujiao routes are intentionally not proxied anymore.
+	redir /shop /payment 308
+	redir /shop/* /payment 308
+
+	# Keep this ahead of the catch-all handle. A bare respond directive is
+	# sorted after handle by Caddy and would never see these requests.
+	handle /internal/* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy sub2api:8080 {
+			import proxy_headers
+			transport http {
+				keepalive 120s
+				keepalive_idle_conns 256
+				read_buffer 16KB
+				write_buffer 16KB
+				compression off
+			}
+
+			# Application-level 5xx responses must not mark the whole gateway
+			# unhealthy and reject unrelated traffic. Transport failures are
+			# still surfaced per request.
+			fail_duration 0
+		}
+	}
+
+	encode {
+		zstd
+		gzip 6
+		minimum_length 256
+		match {
+			# Do not use text/*: it would compress and buffer text/event-stream.
+			header Content-Type text/css*
+			header Content-Type text/csv*
+			header Content-Type text/html*
+			header Content-Type text/javascript*
+			header Content-Type text/markdown*
+			header Content-Type text/plain*
+			header Content-Type text/xml*
+			header Content-Type application/json*
+			header Content-Type application/javascript*
+			header Content-Type application/xml*
+			header Content-Type application/rss+xml*
+			header Content-Type image/svg+xml*
+		}
+	}
+
+	request_body {
+		max_size 256MB
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+
+	handle_errors {
+		respond "{err.status_code} {err.status_text}"
+	}
+}

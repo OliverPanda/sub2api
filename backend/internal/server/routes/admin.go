@@ -114,6 +114,9 @@ func RegisterAdminRoutes(
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
 
+		// 分组鹈鹕测试
+		registerPelicanTestRoutes(admin, h)
+
 		// 渠道管理
 		registerChannelRoutes(admin, h)
 
@@ -132,6 +135,16 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+	}
+}
+
+func registerPelicanTestRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	pelicanTests := admin.Group("/pelican-tests")
+	{
+		pelicanTests.GET("/runs", h.Admin.PelicanTest.ListRuns)
+		pelicanTests.POST("/runs", h.Admin.PelicanTest.CreateRun)
+		pelicanTests.GET("/runs/:id", h.Admin.PelicanTest.GetRun)
+		pelicanTests.DELETE("/runs/:id", h.Admin.PelicanTest.DeleteRun)
 	}
 }
 

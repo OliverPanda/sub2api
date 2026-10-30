@@ -1,5 +1,10 @@
 <template>
   <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+    <!-- 固定区域：页面级概览或提示 -->
+    <div v-if="$slots.default" class="layout-section-fixed">
+      <slot />
+    </div>
+
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed">
       <slot name="actions" />
@@ -8,6 +13,11 @@
     <!-- 固定区域：搜索和过滤器 -->
     <div v-if="$slots.filters" class="layout-section-fixed">
       <slot name="filters" />
+    </div>
+
+    <!-- 固定区域：表格上方的独立区块 -->
+    <div v-if="$slots['pre-table']" class="layout-section-fixed">
+      <slot name="pre-table" />
     </div>
 
     <!-- 滚动区域：表格 -->

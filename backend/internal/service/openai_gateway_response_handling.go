@@ -487,6 +487,11 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		if data, ok := extractOpenAISSEDataLine(line); ok {
 			dataBytes := []byte(data)
 			eventType := effectiveOpenAISSEEventType(dataBytes, pendingSSEEventType)
+			if normalized, changed := normalizeOpenAIIncompleteEvent(dataBytes, eventType); changed {
+				dataBytes = normalized
+				data = string(normalized)
+				line = "data: " + data
+			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed &&
 				(eventType == "response.completed" || eventType == "response.done") {
 				// A later successful terminal is authoritative over a pending bare
@@ -2011,9 +2016,12 @@ func extractCodexFinalResponse(body string) ([]byte, bool) {
 		if normalized, changed := normalizeCompletedImageGenerationStatus(data); changed {
 			data = normalized
 		}
-		if eventType == "response.done" || eventType == "response.completed" {
+		if eventType == "response.done" || eventType == "response.completed" || eventType == "response.incomplete" {
 			if response := gjson.GetBytes(data, "response"); response.Exists() && response.Type == gjson.JSON && response.Raw != "" {
 				finalResponse = []byte(response.Raw)
+				if normalized, changed := normalizeOpenAIIncompleteResponse(finalResponse); changed {
+					finalResponse = normalized
+				}
 			}
 		}
 	})
@@ -2021,6 +2029,58 @@ func extractCodexFinalResponse(body string) ([]byte, bool) {
 		return finalResponse, true
 	}
 	return nil, false
+}
+
+// normalizeOpenAIIncompleteEvent fills the reason omitted by some compatible
+// upstreams. Codex treats a missing reason as "unknown" and reports the whole
+// turn as an opaque client error. An incomplete response without a reason is
+// conventionally an output-budget cutoff; explicit upstream reasons are kept.
+func normalizeOpenAIIncompleteEvent(data []byte, eventType string) ([]byte, bool) {
+	if strings.TrimSpace(eventType) != "response.incomplete" {
+		return data, false
+	}
+	if len(data) == 0 || !gjson.ValidBytes(data) {
+		return data, false
+	}
+	// The event type itself is authoritative; a few relays omit response.status.
+	if gjson.GetBytes(data, "response").Exists() {
+		if strings.TrimSpace(gjson.GetBytes(data, "response.incomplete_details.reason").String()) == "" {
+			updated, err := sjson.SetBytes(data, "response.incomplete_details.reason", "max_output_tokens")
+			if err == nil {
+				return updated, true
+			}
+		}
+	}
+	return normalizeOpenAIIncompleteResponse(data)
+}
+
+func normalizeOpenAIIncompleteResponse(data []byte) ([]byte, bool) {
+	if len(data) == 0 || !gjson.ValidBytes(data) {
+		return data, false
+	}
+	status := strings.TrimSpace(gjson.GetBytes(data, "response.status").String())
+	if status == "" {
+		status = strings.TrimSpace(gjson.GetBytes(data, "status").String())
+	}
+	if status != "incomplete" {
+		return data, false
+	}
+	reason := strings.TrimSpace(gjson.GetBytes(data, "response.incomplete_details.reason").String())
+	if reason == "" {
+		reason = strings.TrimSpace(gjson.GetBytes(data, "incomplete_details.reason").String())
+	}
+	if reason != "" {
+		return data, false
+	}
+	path := "incomplete_details"
+	if gjson.GetBytes(data, "response").Exists() {
+		path = "response.incomplete_details"
+	}
+	updated, err := sjson.SetBytes(data, path+".reason", "max_output_tokens")
+	if err != nil {
+		return data, false
+	}
+	return updated, true
 }
 
 func normalizeCompletedImageGenerationStatus(data []byte) ([]byte, bool) {

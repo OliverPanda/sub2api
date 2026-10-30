@@ -1,32 +1,121 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">Sub2API</title>
-  <desc id="desc">An interlocking S symbol representing subscription routing into APIs.</desc>
+  <title id="title">小叮当 API</title>
+  <desc id="desc">A friendly blue-and-white robot cat mascot with an API signal and golden bell.</desc>
   <defs>
-    <linearGradient id="s2a-bg" x1="72" y1="44" x2="442" y2="478" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#142B56"/>
-      <stop offset=".52" stop-color="#0A1A39"/>
+    <linearGradient id="xd-bg" x1="72" y1="52" x2="448" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173B78"/>
+      <stop offset=".48" stop-color="#0B1D44"/>
       <stop offset="1" stop-color="#061127"/>
     </linearGradient>
-    <radialGradient id="s2a-ambient" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(168 92) rotate(51) scale(342 382)">
-      <stop stop-color="#3E68B0" stop-opacity=".28"/>
-      <stop offset="1" stop-color="#3E68B0" stop-opacity="0"/>
+    <radialGradient id="xd-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(168 100) rotate(51) scale(352 390)">
+      <stop stop-color="#45D9FF" stop-opacity=".3"/>
+      <stop offset=".7" stop-color="#3778FF" stop-opacity=".07"/>
+      <stop offset="1" stop-color="#3778FF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="s2a-brand" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#79F4BD"/>
-      <stop offset=".48" stop-color="#39D9E7"/>
-      <stop offset="1" stop-color="#3875F6"/>
+    <linearGradient id="xd-blue" x1="145" y1="112" x2="371" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64E4FF"/>
+      <stop offset=".46" stop-color="#3298F5"/>
+      <stop offset="1" stop-color="#1D55D8"/>
     </linearGradient>
-    <filter id="s2a-shadow" x="-25%" y="-25%" width="150%" height="165%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy=".55" stdDeviation=".65" flood-color="#020817" flood-opacity=".34"/>
+    <linearGradient id="xd-blue-dark" x1="143" y1="133" x2="366" y2="379" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1986DA"/>
+      <stop offset="1" stop-color="#1339A5"/>
+    </linearGradient>
+    <linearGradient id="xd-face" x1="190" y1="198" x2="324" y2="365" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D9F4FF"/>
+    </linearGradient>
+    <linearGradient id="xd-bell" x1="233" y1="344" x2="280" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE778"/>
+      <stop offset="1" stop-color="#F4A51B"/>
+    </linearGradient>
+    <filter id="xd-shadow" x="-30%" y="-30%" width="170%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#020817" flood-opacity=".38"/>
+    </filter>
+    <filter id="xd-soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
     </filter>
   </defs>
 
-  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#s2a-bg)"/>
-  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#s2a-ambient)"/>
-  <rect x="16.75" y="16.75" width="478.5" height="478.5" rx="119.25" fill="none" stroke="#A5BFFF" stroke-opacity=".16" stroke-width="1.5"/>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#xd-bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#xd-glow)"/>
+  <rect x="16.75" y="16.75" width="478.5" height="478.5" rx="119.25" fill="none" stroke="#A5CFFF" stroke-opacity=".17" stroke-width="1.5"/>
 
-  <g transform="translate(52 52) scale(17)" fill="none" stroke="url(#s2a-brand)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.7" filter="url(#s2a-shadow)">
-    <path d="m19.25 7.65-2.55-3.2a1.33 1.33 0 0 0-1.03-.5H8.58c-.34 0-.67.13-.91.37L4.15 7.65c-.93.88-.6 1.52.65 2.3l9.55 5.97"/>
-    <path d="m4.75 16.35 2.55 3.2c.25.31.63.5 1.03.5h7.09c.34 0 .67-.13.91-.37l3.52-3.33c.93-.88.6-1.52-.65-2.3L9.65 8.08"/>
+  <!-- Orbit and API signal nodes -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M92 280A168 168 0 0 1 164 127" stroke="#4FE3FF" stroke-opacity=".55" stroke-width="5"/>
+    <path d="M348 127a168 168 0 0 1 72 153" stroke="#4FE3FF" stroke-opacity=".32" stroke-width="5"/>
+    <path d="M112 333a168 168 0 0 0 49 55" stroke="#6B8EFF" stroke-opacity=".5" stroke-width="4"/>
+  </g>
+  <g fill="#5FE8FF">
+    <circle cx="92" cy="280" r="7"/>
+    <circle cx="164" cy="127" r="7"/>
+    <circle cx="420" cy="280" r="5" opacity=".7"/>
+    <circle cx="161" cy="388" r="5" opacity=".7"/>
+  </g>
+
+  <!-- Robot-cat ears and head -->
+  <g filter="url(#xd-shadow)">
+    <path d="M167 170 156 92c-1-9 8-16 16-11l65 37" fill="url(#xd-blue-dark)"/>
+    <path d="M345 170 356 92c1-9-8-16-16-11l-65 37" fill="url(#xd-blue-dark)"/>
+    <path d="M174 153 166 108l42 24" fill="#80EBFF" fill-opacity=".62"/>
+    <path d="M338 153 346 108l-42 24" fill="#80EBFF" fill-opacity=".62"/>
+    <circle cx="256" cy="267" r="155" fill="url(#xd-blue)"/>
+    <path d="M118 247c12-77 69-122 138-122 70 0 128 45 139 122-20-36-77-58-139-58-61 0-118 22-138 58Z" fill="#8BEFFF" fill-opacity=".18"/>
+  </g>
+
+  <!-- Antenna -->
+  <g stroke-linecap="round">
+    <path d="M256 116V74" stroke="#4FCFFF" stroke-width="10"/>
+    <circle cx="256" cy="68" r="16" fill="#0A204D" stroke="#6BE9FF" stroke-width="7"/>
+    <circle cx="256" cy="68" r="6" fill="#C8FAFF"/>
+    <circle cx="256" cy="68" r="25" fill="#45DFFF" fill-opacity=".15" filter="url(#xd-soft)"/>
+  </g>
+
+  <!-- Face -->
+  <path d="M256 167c-66 0-112 39-112 103 0 77 48 124 112 124s112-47 112-124c0-64-46-103-112-103Z" fill="url(#xd-face)"/>
+  <path d="M256 167c-66 0-112 39-112 103 0 8 1 16 2 24 10-58 51-91 110-91s100 33 110 91c1-8 2-16 2-24 0-64-46-103-112-103Z" fill="#FFFFFF" fill-opacity=".75"/>
+
+  <!-- Eyes -->
+  <ellipse cx="209" cy="258" rx="27" ry="38" fill="#071B3E"/>
+  <ellipse cx="303" cy="258" rx="27" ry="38" fill="#071B3E"/>
+  <ellipse cx="200" cy="244" rx="9" ry="12" fill="#FFFFFF"/>
+  <ellipse cx="294" cy="244" rx="9" ry="12" fill="#FFFFFF"/>
+  <circle cx="218" cy="271" r="5" fill="#59DFFF" fill-opacity=".85"/>
+  <circle cx="312" cy="271" r="5" fill="#59DFFF" fill-opacity=".85"/>
+
+  <!-- Nose, smile, whiskers -->
+  <path d="M244 302c7-8 17-8 24 0-2 11-8 17-12 17s-10-6-12-17Z" fill="#F24E5E"/>
+  <path d="M256 319v14c0 13 15 21 29 12" fill="none" stroke="#0A2850" stroke-width="7" stroke-linecap="round"/>
+  <g fill="none" stroke="#173B70" stroke-width="6" stroke-linecap="round" opacity=".86">
+    <path d="m187 305-43-11"/>
+    <path d="m187 321-46 7"/>
+    <path d="m325 305 43-11"/>
+    <path d="m325 321 46 7"/>
+  </g>
+  <g fill="#FF8EA0" opacity=".42">
+    <ellipse cx="177" cy="292" rx="17" ry="8"/>
+    <ellipse cx="335" cy="292" rx="17" ry="8"/>
+  </g>
+
+  <!-- Collar and API bell -->
+  <path d="M181 376c42 23 108 23 150 0" fill="none" stroke="#DD3049" stroke-width="26" stroke-linecap="round"/>
+  <path d="M189 372c39 17 95 17 134 0" fill="none" stroke="#FF7180" stroke-width="6" stroke-linecap="round" opacity=".6"/>
+  <circle cx="256" cy="389" r="34" fill="url(#xd-bell)" stroke="#B96E08" stroke-width="5"/>
+  <path d="M256 367v44M238 378h36M240 400h32" fill="none" stroke="#A85D05" stroke-width="5" stroke-linecap="round" opacity=".72"/>
+  <circle cx="256" cy="389" r="6" fill="#FFF3A7"/>
+  <circle cx="256" cy="389" r="43" fill="#FFD44E" fill-opacity=".12" filter="url(#xd-soft)"/>
+
+  <!-- API badge on chest -->
+  <g transform="translate(194 423)">
+    <rect width="124" height="38" rx="19" fill="#071A3B" stroke="#60E4FF" stroke-opacity=".72" stroke-width="2"/>
+    <circle cx="24" cy="19" r="5" fill="#63F1C1"/>
+    <text x="39" y="26" fill="#DDFBFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" letter-spacing="2">API</text>
+  </g>
+
+  <!-- Tiny circuit sparks -->
+  <g fill="none" stroke="#68EAFF" stroke-width="4" stroke-linecap="round">
+    <path d="M104 179h-18v-18"/>
+    <path d="M408 334h18v18"/>
   </g>
 </svg>

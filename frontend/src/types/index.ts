@@ -287,8 +287,6 @@ export interface PublicSettings {
   service_quota_enabled: boolean
   affiliate_enabled: boolean
   allow_user_view_error_requests?: boolean
-  /** True when the deployment configures MCP_PUBLIC_URL; MCP is disabled otherwise. */
-  mcp_enabled?: boolean
 }
 
 export interface AuthResponse {
@@ -596,7 +594,6 @@ export interface Group {
   // 图片生成计费配置
   allow_image_generation: boolean
   allow_batch_image_generation: boolean
-  image_count_billing: boolean
   image_rate_independent: boolean
   image_rate_multiplier: number
   batch_image_discount_multiplier: number
@@ -679,6 +676,58 @@ export interface AdminGroup extends Group {
 export interface ModelAllowlist {
   enabled: boolean
   models: string[]
+}
+
+// ==================== Pelican Test Types ====================
+
+export type PelicanTestRunStatus = 'running' | 'completed' | 'failed'
+export type PelicanTestResultStatus = 'success' | 'failed'
+
+export interface PelicanTestRun {
+  id: number
+  group_id: number | null
+  group_name: string
+  model_id: string
+  prompt: string
+  status: PelicanTestRunStatus
+  total_accounts: number
+  success_count: number
+  failed_count: number
+  skipped_count: number
+  error_message: string
+  created_by: number
+  started_at: string
+  finished_at: string | null
+  created_at: string
+}
+
+export interface PelicanTestResult {
+  id: number
+  run_id: number
+  group_id: number | null
+  account_id: number | null
+  account_name: string
+  platform: string
+  model_id: string
+  status: PelicanTestResultStatus
+  raw_output: string
+  svg_content: string
+  error_message: string
+  latency_ms: number
+  started_at: string
+  finished_at: string
+  created_at: string
+}
+
+export interface PelicanTestRunDetail extends PelicanTestRun {
+  results: PelicanTestResult[]
+}
+
+export interface CreatePelicanTestRunRequest {
+  group_id: number
+  model_id: string
+  account_ids?: number[]
+  prompt?: string
 }
 
 // 固定账号获取 Codex Model Manifest 配置（仅 openai 分组）
@@ -822,7 +871,6 @@ export interface CreateGroupRequest {
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
-  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
@@ -890,7 +938,6 @@ export interface UpdateGroupRequest {
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
-  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
@@ -1099,6 +1146,31 @@ export interface UpstreamBillingData {
   effective_rate_multiplier: number
   timezone?: string
   observed_at: string
+  // Optional upstream wallet / key-quota figures; absent on older upstreams.
+  balance?: number
+  quota?: number
+  quota_used?: number
+}
+
+export interface UpstreamBalanceItem {
+  base_url: string
+  accounts: number
+  ok_accounts: number
+  balance?: number
+  currency?: string
+  has_balance: boolean
+  received_at?: string
+  stale?: boolean
+  probe_status?: string
+  last_error?: string
+}
+
+export interface UpstreamBalancesResponse {
+  items: UpstreamBalanceItem[]
+  total: number
+  has_total: boolean
+  probe_failed: number
+  accounts: number
 }
 
 export type UpstreamBillingProbeStatus = 'ok' | 'unsupported' | 'failed'
@@ -1229,37 +1301,6 @@ export interface OpenCodeGoUsageSettings {
   interval_minutes: number
   /** Trailing quiet period after the latest model request (minutes). */
   debounce_minutes: number
-}
-
-export interface GrokCatalogScope {
-  account_id: number
-  account_type: string
-  endpoint: string
-  fingerprint: string
-}
-
-export interface GrokCatalogAttempt {
-  started_at: string
-  finished_at: string
-  status: string
-  error_code?: string
-  scope?: GrokCatalogScope
-}
-
-export interface GrokModelDiagnosticItem {
-  requested: string
-  upstream?: string
-  status: string
-}
-
-export interface GrokModelDiagnostics {
-  state: string
-  endpoint?: string
-  fetched_at?: string
-  expires_at?: string
-  models: string[]
-  last_attempt?: GrokCatalogAttempt
-  mappings: GrokModelDiagnosticItem[]
 }
 
 export interface Account {
@@ -1405,8 +1446,6 @@ export interface Account {
   parent_privacy_mode?: string
   parent_subscription_expires_at?: string
   parent_chatgpt_account_id?: string
-
-  grok_model_diagnostics?: GrokModelDiagnostics
 }
 
 // The admin account list may return this compact shape when lite=1. Detail
