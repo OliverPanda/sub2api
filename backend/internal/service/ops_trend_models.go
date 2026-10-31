@@ -64,3 +64,29 @@ type OpsErrorDistributionResponse struct {
 	Total int64                       `json:"total"`
 	Items []*OpsErrorDistributionItem `json:"items"`
 }
+
+// OpsGroupQualityItem is one row in the admin group-quality ranking.
+type OpsGroupQualityItem struct {
+	GroupID           int64   `json:"group_id"`
+	GroupName         string  `json:"group_name"`
+	Platform          string  `json:"platform"`
+	RequestCount      int64   `json:"request_count"`
+	SuccessCount      int64   `json:"success_count"`
+	ErrorCountSLA     int64   `json:"error_count_sla"`
+	SuccessRate       float64 `json:"success_rate"`
+	UpstreamErrorRate float64 `json:"upstream_error_rate"`
+	RateLimitRate     float64 `json:"rate_limit_rate"`
+	P95DurationMs     *int    `json:"p95_duration_ms"`
+	P95TTFTMs         *int    `json:"p95_ttft_ms"`
+	SampleCount       int64   `json:"sample_count"`
+	SampleSufficient  bool    `json:"sample_sufficient"`
+}
+
+type OpsGroupQualityResponse struct {
+	StartTime               time.Time              `json:"start_time"`
+	EndTime                 time.Time              `json:"end_time"`
+	Platform                string                 `json:"platform"`
+	MinSample               int                    `json:"min_sample"`
+	Items                   []*OpsGroupQualityItem `json:"items"`
+	InsufficientSampleCount int                    `json:"insufficient_sample_count"`
+}

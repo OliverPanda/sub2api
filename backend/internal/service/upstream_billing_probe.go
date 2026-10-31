@@ -1177,3 +1177,8 @@ func safeProbeError(err error) string {
 	}
 	return "probe_failed"
 }
+
+// DecodeUpstreamBillingProbeSnapshotPublic exposes the persisted probe decoder to admin handlers.
+func DecodeUpstreamBillingProbeSnapshotPublic(extra map[string]any) *UpstreamBillingProbeSnapshot {
+	return decodeUpstreamBillingProbeSnapshot(extra)
+}
