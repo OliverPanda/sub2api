@@ -20,14 +20,13 @@ const componentPath = resolve(dirname(fileURLToPath(import.meta.url)), '../Avail
 const componentSource = readFileSync(componentPath, 'utf8')
 
 describe('AvailableChannelsTable scroll integration', () => {
-  // #4555：根元素必须是 TablePageLayout 滚动链约定的 .table-wrapper，
-  // 否则内容超出视口高度时被外层 overflow-hidden 裁剪且没有滚动条。
-  it('mounts the table on the .table-wrapper scroll hook', () => {
-    expect(componentSource).toMatch(/<div class="table-wrapper">\s*<table/)
+  it('mounts channel cards on the .table-wrapper scroll hook', () => {
+    expect(componentSource).toMatch(/<div class="table-wrapper">\s*<div/)
+    expect(componentSource).toContain('data-testid="available-channel-cards"')
   })
 
-  it('does not clip content with its own overflow-hidden card wrapper', () => {
-    expect(componentSource).not.toMatch(/<div class="card overflow-hidden">/)
+  it('does not clip content with its own overflow-hidden wrapper', () => {
+    expect(componentSource).not.toMatch(/overflow-hidden/)
   })
 })
 
@@ -109,42 +108,27 @@ function mountTable(props = {}) {
   })
 }
 
-describe('AvailableChannelsTable responsive surfaces', () => {
-  it('keeps the five-column table as the desktop-only surface', () => {
+describe('AvailableChannelsTable card layout', () => {
+  it('renders the same channel card layout at desktop and mobile breakpoints', () => {
     const wrapper = mountTable()
-    const desktop = wrapper.get('[data-testid="desktop-channels"]')
+    const cards = wrapper.get('[data-testid="available-channel-cards"]')
 
-    // TablePageLayout has a more-specific `display: table` rule for descendants,
-    // so these display utilities must remain important at both breakpoints.
-    expect(desktop.classes()).toContain('!hidden')
-    expect(desktop.classes()).toContain('lg:!table')
-    expect(desktop.findAll('thead th')).toHaveLength(5)
-    expect(desktop.text()).toContain('Primary channel')
-    expect(desktop.text()).toContain('Fast and reliable access')
-    expect(desktop.findAll('[data-group-badge]')).toHaveLength(2)
-    expect(desktop.get('[data-model-chip]').text()).toContain('claude-test:No pricing')
-  })
-
-  it('renders a mobile-only readable surface with groups, rates, peaks, and model pricing chips', () => {
-    const wrapper = mountTable()
-    const mobile = wrapper.get('[data-testid="mobile-channels"]')
-
-    expect(mobile.classes()).toContain('lg:hidden')
-    expect(mobile.classes()).toContain('overflow-x-hidden')
-    expect(mobile.text()).toContain('Primary channel')
-    expect(mobile.text()).toContain('Fast and reliable access')
-    expect(mobile.text()).toContain('Groups and rates')
-    expect(mobile.text()).toContain('Models and pricing')
-    expect(mobile.text()).toContain('availableChannels.exclusive')
-    expect(mobile.text()).toContain('availableChannels.public')
-    expect(mobile.get('[data-group-badge]').text()).toBe('Exclusive Pro:1.2:0.8')
-    expect(mobile.findAll('[data-group-badge]')).toHaveLength(2)
-    expect(mobile.get('[data-icon="clock"]')).toBeTruthy()
-    expect(mobile.text()).toContain('08:00')
-    expect(mobile.text()).toContain('10:00')
-    expect(mobile.text()).toContain('×1.5')
-    expect(mobile.get('[data-model-chip]').text()).toBe('claude-test:No pricing')
-    expect(mobile.findAll('.max-w-full')).not.toHaveLength(0)
+    expect(cards.classes()).toContain('md:grid-cols-2')
+    expect(cards.classes()).toContain('xl:grid-cols-3')
+    expect(cards.text()).toContain('Primary channel')
+    expect(cards.text()).toContain('Fast and reliable access')
+    expect(cards.text()).toContain('Groups and rates')
+    expect(cards.text()).toContain('Models and pricing')
+    expect(cards.text()).toContain('availableChannels.exclusive')
+    expect(cards.text()).toContain('availableChannels.public')
+    expect(cards.get('[data-group-badge]').text()).toBe('Exclusive Pro:1.2:0.8')
+    expect(cards.findAll('[data-group-badge]')).toHaveLength(2)
+    expect(cards.get('[data-icon="clock"]')).toBeTruthy()
+    expect(cards.text()).toContain('08:00')
+    expect(cards.text()).toContain('10:00')
+    expect(cards.text()).toContain('×1.5')
+    expect(cards.get('[data-model-chip]').text()).toBe('claude-test:No pricing')
+    expect(cards.findAll('.max-w-full')).not.toHaveLength(0)
   })
 
   it('keeps the mobile placeholders when a platform has no groups or models', () => {
@@ -157,23 +141,21 @@ describe('AvailableChannelsTable responsive surfaces', () => {
         },
       ],
     })
-    const mobile = wrapper.get('[data-testid="mobile-channels"]')
+    const cards = wrapper.get('[data-testid="available-channel-cards"]')
 
-    expect(mobile.text()).toContain('Fallback channel')
-    expect(mobile.text()).toContain('openai')
-    expect(mobile.text()).toContain('No models')
-    expect(mobile.findAll('dd')[0].text()).toBe('-')
+    expect(cards.text()).toContain('Fallback channel')
+    expect(cards.text()).toContain('openai')
+    expect(cards.text()).toContain('No models')
+    expect(cards.findAll('[data-group-badge]')).toHaveLength(0)
   })
 
-  it('provides loading and empty states on both responsive surfaces', async () => {
+  it('provides card loading and empty states', async () => {
     const wrapper = mountTable({ loading: true, rows: [] })
 
-    expect(wrapper.get('[data-testid="desktop-channels"] [data-icon="refresh"]')).toBeTruthy()
-    expect(wrapper.get('[data-testid="mobile-loading"] [data-icon="refresh"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="channels-loading"]').findAll('.animate-pulse')).toHaveLength(6)
 
     await wrapper.setProps({ loading: false })
 
-    expect(wrapper.get('[data-testid="desktop-channels"]').text()).toContain('No channels')
-    expect(wrapper.get('[data-testid="mobile-empty"]').text()).toContain('No channels')
+    expect(wrapper.get('[data-testid="channels-empty"]').text()).toContain('No channels')
   })
 })

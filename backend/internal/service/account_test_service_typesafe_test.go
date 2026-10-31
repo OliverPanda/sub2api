@@ -66,7 +66,7 @@ func TestTypeSafeAccountTestMarksRejectedKey(t *testing.T) {
 			svc, repo, _, c, rec := newTypeSafeAccountTestFixture(t, status, `{"detail":"invalid key"}`)
 			require.Error(t, svc.TestAccountConnection(c, 31, "", "", AccountTestModeDefault))
 			require.Equal(t, 1, repo.errorCalls)
-			responseText, errMsg, _ := parseTestSSEOutput(rec.Body.String())
+			responseText, errMsg := parseTestSSEOutput(rec.Body.String())
 			require.Empty(t, responseText)
 			require.Contains(t, errMsg, "API returned")
 		})
