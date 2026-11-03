@@ -119,6 +119,52 @@ export interface AffiliateUserOverview {
   history_quota: number
 }
 
+export interface AffiliateProfitRow {
+  inviter_id: number
+  inviter_email: string
+  inviter_username: string
+  aff_code: string
+  account_id: number
+  account_name: string
+  channel_id?: number | null
+  channel_name: string
+  invitee_count: number
+  request_count: number
+  revenue: number
+  estimated_cost: number
+  gross_profit: number
+  share_amount: number
+}
+
+export interface AffiliateProfitReport {
+  items: AffiliateProfitRow[]
+  total: number
+  page: number
+  page_size: number
+  share_rate_percent: number
+  totals: {
+    invitee_count: number
+    request_count: number
+    revenue: number
+    estimated_cost: number
+    gross_profit: number
+    share_amount: number
+  }
+}
+
+export interface AffiliateProfitReportParams {
+  page?: number
+  page_size?: number
+  search?: string
+  start_at?: string
+  end_at?: string
+  share_rate_percent?: number
+  timezone?: string
+}
+
+export interface AffiliateProfitOverviewRow { group_name: string; model: string; account_name: string; channel_name: string; request_count: number; revenue: number; estimated_cost: number; gross_profit: number }
+export interface AffiliateProfitOverview { items: AffiliateProfitOverviewRow[]; totals: { request_count: number; revenue: number; estimated_cost: number; gross_profit: number } }
+
 export interface UpdateAffiliateUserRequest {
   aff_code?: string
   aff_rebate_rate_percent?: number | null
@@ -236,6 +282,31 @@ export async function listTransferRecords(
   return data
 }
 
+export async function getProfitReport(
+  params: AffiliateProfitReportParams = {},
+): Promise<AffiliateProfitReport> {
+  const { data } = await apiClient.get<AffiliateProfitReport>(
+    '/admin/affiliates/profit-report',
+    {
+      params: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 50,
+        search: params.search || undefined,
+        start_at: params.start_at || undefined,
+        end_at: params.end_at || undefined,
+        share_rate_percent: params.share_rate_percent ?? 30,
+        timezone: params.timezone || undefined,
+      },
+    },
+  )
+  return data
+}
+
+export async function getProfitOverview(params: AffiliateProfitReportParams = {}): Promise<AffiliateProfitOverview> {
+  const { data } = await apiClient.get<AffiliateProfitOverview>('/admin/affiliates/profit-overview', { params: { search: params.search || undefined, start_at: params.start_at || undefined, end_at: params.end_at || undefined, share_rate_percent: params.share_rate_percent ?? 30, timezone: params.timezone || undefined } })
+  return data
+}
+
 export async function getUserOverview(
   userId: number,
 ): Promise<AffiliateUserOverview> {
@@ -275,6 +346,7 @@ export const affiliatesAPI = {
   listInviteRecords,
   listRebateRecords,
   listTransferRecords,
+  getProfitReport,
   getUserOverview,
   withdrawUserQuota,
 }

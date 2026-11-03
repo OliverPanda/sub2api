@@ -38,6 +38,13 @@ type OpsOutputTPS struct {
 	SampleCount int64    `json:"sample_count"`
 }
 
+type OpsCacheStats struct {
+	InputTokens         int64    `json:"input_tokens"`
+	CacheReadTokens     int64    `json:"cache_read_tokens"`
+	CacheCreationTokens int64    `json:"cache_creation_tokens"`
+	HitRate             *float64 `json:"hit_rate"`
+}
+
 type OpsDashboardOverview struct {
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
@@ -71,9 +78,10 @@ type OpsDashboardOverview struct {
 	Upstream429Count             int64   `json:"upstream_429_count"`
 	Upstream529Count             int64   `json:"upstream_529_count"`
 
-	QPS       OpsRateSummary `json:"qps"`
-	TPS       OpsRateSummary `json:"tps"`
-	OutputTPS *OpsOutputTPS  `json:"output_tps"`
+	QPS        OpsRateSummary `json:"qps"`
+	TPS        OpsRateSummary `json:"tps"`
+	OutputTPS  *OpsOutputTPS  `json:"output_tps"`
+	CacheStats *OpsCacheStats `json:"cache_stats"`
 
 	Duration OpsPercentiles `json:"duration"`
 	TTFT     OpsPercentiles `json:"ttft"`

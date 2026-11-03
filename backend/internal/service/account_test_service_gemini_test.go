@@ -69,3 +69,10 @@ func TestGeminiDefaultTestModel(t *testing.T) {
 	apiKey := &Account{Platform: PlatformGemini, Type: AccountTypeAPIKey}
 	require.Equal(t, geminicli.DefaultTestModel, geminiDefaultTestModel(apiKey))
 }
+
+func geminiDefaultTestModel(account *Account) string {
+	if account != nil && account.Type == AccountTypeOAuth && account.Credentials["oauth_type"] == "google_one" {
+		return geminicli.GoogleOneModels[0].ID
+	}
+	return geminicli.DefaultTestModel
+}

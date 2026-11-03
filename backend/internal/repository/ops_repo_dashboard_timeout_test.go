@@ -66,3 +66,27 @@ func TestOpsOutputTPSOverviewFailurePolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestOpsCacheHitRateUsesTokenWeightedTotals(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer db.Close()
+	repo := &opsRepository{db: db}
+	now := time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(`percentile_cont\(0.05\)`).WillReturnRows(
+		sqlmock.NewRows([]string{"p5", "p10", "p50", "avg", "sample_count", "cache_read", "cache_creation", "input"}).
+			AddRow(10.0, 20.0, 30.0, 25.0, int64(4), int64(600), int64(100), int64(300)),
+	)
+
+	output, cache, err := repo.queryOutputTPS(context.Background(), &service.OpsDashboardFilter{
+		StartTime: now.Add(-time.Hour),
+		EndTime:   now,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 4, output.SampleCount)
+	require.EqualValues(t, 600, cache.CacheReadTokens)
+	require.EqualValues(t, 100, cache.CacheCreationTokens)
+	require.EqualValues(t, 300, cache.InputTokens)
+	require.NotNil(t, cache.HitRate)
+	require.InDelta(t, 0.6, *cache.HitRate, 1e-9)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

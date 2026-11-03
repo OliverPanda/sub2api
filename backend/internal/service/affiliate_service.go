@@ -119,7 +119,74 @@ type AffiliateRepository interface {
 	ListAffiliateInviteRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateInviteRecord, int64, error)
 	ListAffiliateRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error)
 	ListAffiliateTransferRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateTransferRecord, int64, error)
+	GetAffiliateProfitReport(ctx context.Context, filter AffiliateProfitFilter) (*AffiliateProfitReport, error)
+	GetAffiliateProfitOverview(ctx context.Context, filter AffiliateProfitFilter) (*AffiliateProfitOverview, error)
 	GetAffiliateUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error)
+}
+
+type AffiliateProfitFilter struct {
+	Search           string
+	Page             int
+	PageSize         int
+	StartAt          *time.Time
+	EndAt            *time.Time
+	ShareRatePercent float64
+}
+
+type AffiliateProfitRow struct {
+	InviterID       int64   `json:"inviter_id"`
+	InviterEmail    string  `json:"inviter_email"`
+	InviterUsername string  `json:"inviter_username"`
+	AffCode         string  `json:"aff_code"`
+	AccountID       int64   `json:"account_id"`
+	AccountName     string  `json:"account_name"`
+	ChannelID       *int64  `json:"channel_id,omitempty"`
+	ChannelName     string  `json:"channel_name"`
+	InviteeCount    int64   `json:"invitee_count"`
+	RequestCount    int64   `json:"request_count"`
+	Revenue         float64 `json:"revenue"`
+	EstimatedCost   float64 `json:"estimated_cost"`
+	GrossProfit     float64 `json:"gross_profit"`
+	ShareAmount     float64 `json:"share_amount"`
+}
+
+type AffiliateProfitTotals struct {
+	InviteeCount  int64   `json:"invitee_count"`
+	RequestCount  int64   `json:"request_count"`
+	Revenue       float64 `json:"revenue"`
+	EstimatedCost float64 `json:"estimated_cost"`
+	GrossProfit   float64 `json:"gross_profit"`
+	ShareAmount   float64 `json:"share_amount"`
+}
+
+type AffiliateProfitReport struct {
+	Items     []AffiliateProfitRow  `json:"items"`
+	Total     int64                 `json:"total"`
+	Page      int                   `json:"page"`
+	PageSize  int                   `json:"page_size"`
+	ShareRate float64               `json:"share_rate_percent"`
+	Totals    AffiliateProfitTotals `json:"totals"`
+}
+
+type AffiliateProfitOverview struct {
+	Items  []AffiliateProfitOverviewRow  `json:"items"`
+	Totals AffiliateProfitOverviewTotals `json:"totals"`
+}
+type AffiliateProfitOverviewRow struct {
+	GroupName     string  `json:"group_name"`
+	Model         string  `json:"model"`
+	AccountName   string  `json:"account_name"`
+	ChannelName   string  `json:"channel_name"`
+	RequestCount  int64   `json:"request_count"`
+	Revenue       float64 `json:"revenue"`
+	EstimatedCost float64 `json:"estimated_cost"`
+	GrossProfit   float64 `json:"gross_profit"`
+}
+type AffiliateProfitOverviewTotals struct {
+	RequestCount  int64   `json:"request_count"`
+	Revenue       float64 `json:"revenue"`
+	EstimatedCost float64 `json:"estimated_cost"`
+	GrossProfit   float64 `json:"gross_profit"`
 }
 
 // AffiliateAdminFilter 列表筛选条件
@@ -647,6 +714,37 @@ func (s *AffiliateService) AdminListTransferRecords(ctx context.Context, filter 
 		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
 	return s.repo.ListAffiliateTransferRecords(ctx, normalizeAffiliateRecordFilter(filter))
+}
+
+func (s *AffiliateService) AdminGetProfitReport(ctx context.Context, filter AffiliateProfitFilter) (*AffiliateProfitReport, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 50
+	}
+	if filter.PageSize > 200 {
+		filter.PageSize = 200
+	}
+	if math.IsNaN(filter.ShareRatePercent) || math.IsInf(filter.ShareRatePercent, 0) || filter.ShareRatePercent < 0 || filter.ShareRatePercent > 100 {
+		return nil, infraerrors.BadRequest("INVALID_SHARE_RATE", "share rate must be between 0 and 100")
+	}
+	return s.repo.GetAffiliateProfitReport(ctx, filter)
+}
+
+func (s *AffiliateService) AdminGetProfitOverview(ctx context.Context, filter AffiliateProfitFilter) (*AffiliateProfitOverview, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if math.IsNaN(filter.ShareRatePercent) || math.IsInf(filter.ShareRatePercent, 0) || filter.ShareRatePercent < 0 || filter.ShareRatePercent > 100 {
+		return nil, infraerrors.BadRequest("INVALID_SHARE_RATE", "share rate must be between 0 and 100")
+	}
+	return s.repo.GetAffiliateProfitOverview(ctx, filter)
 }
 
 func (s *AffiliateService) AdminGetUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error) {

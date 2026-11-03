@@ -53,43 +53,67 @@ func (r *opsRepository) GetDashboardOverview(ctx context.Context, filter *servic
 	// preagg mode: hourly percentiles cannot be averaged into window percentiles.
 	rateCtx, cancelRate := context.WithTimeout(ctx, opsRawLatencyQueryTimeout)
 	defer cancelRate()
-	overview.OutputTPS, err = r.queryOutputTPS(rateCtx, filter)
+	overview.OutputTPS, overview.CacheStats, err = r.queryOutputTPS(rateCtx, filter)
 	if err != nil && !isQueryTimeoutErr(err) {
 		return nil, err
 	}
 	return overview, nil
 }
 
-func (r *opsRepository) queryOutputTPS(ctx context.Context, filter *service.OpsDashboardFilter) (*service.OpsOutputTPS, error) {
+func (r *opsRepository) queryOutputTPS(ctx context.Context, filter *service.OpsDashboardFilter) (*service.OpsOutputTPS, *service.OpsCacheStats, error) {
 	join, where, args, _ := buildUsageWhere(filter, filter.StartTime.UTC(), filter.EndTime.UTC(), 1)
 	query := `
 SELECT
- percentile_cont(0.05) WITHIN GROUP (ORDER BY output_tps),
- percentile_cont(0.10) WITHIN GROUP (ORDER BY output_tps),
- percentile_cont(0.50) WITHIN GROUP (ORDER BY output_tps),
- AVG(output_tps),
- COUNT(*)
+ percentile_cont(0.05) WITHIN GROUP (ORDER BY output_tps) FILTER (WHERE output_tps IS NOT NULL),
+ percentile_cont(0.10) WITHIN GROUP (ORDER BY output_tps) FILTER (WHERE output_tps IS NOT NULL),
+ percentile_cont(0.50) WITHIN GROUP (ORDER BY output_tps) FILTER (WHERE output_tps IS NOT NULL),
+ AVG(output_tps) FILTER (WHERE output_tps IS NOT NULL),
+ COUNT(output_tps),
+ COALESCE(SUM(cache_read_tokens), 0),
+ COALESCE(SUM(cache_creation_tokens), 0),
+ COALESCE(SUM(input_tokens), 0)
 FROM (
- SELECT ul.output_tokens * 1000.0 / NULLIF(ul.duration_ms, 0) AS output_tps
+ SELECT
+   CASE
+     WHEN ul.output_tokens > 0 AND ul.duration_ms > 0
+       AND ul.image_count = 0 AND ul.image_output_tokens = 0
+       AND COALESCE(ul.billing_mode, '') <> 'image'
+       AND ul.request_type IN (` + fmt.Sprintf("%d, %d, %d, %d",
+		service.RequestTypeSync, service.RequestTypeStream, service.RequestTypeWSV2, service.RequestTypeCyberBlocked) + `)
+     THEN ul.output_tokens * 1000.0 / NULLIF(ul.duration_ms, 0)
+   END AS output_tps,
+   ul.input_tokens AS input_tokens,
+   ul.cache_read_tokens AS cache_read_tokens,
+   ul.cache_creation_tokens AS cache_creation_tokens
  FROM usage_logs ul
  ` + join + `
  ` + where + `
- AND ul.output_tokens > 0 AND ul.duration_ms > 0
- AND ul.image_count = 0 AND ul.image_output_tokens = 0
- AND COALESCE(ul.billing_mode, '') <> 'image'
- ` + fmt.Sprintf("AND ul.request_type IN (%d, %d, %d, %d)",
-		service.RequestTypeSync, service.RequestTypeStream, service.RequestTypeWSV2, service.RequestTypeCyberBlocked) + `
 ) rates`
 	var stats service.OpsOutputTPS
-	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&stats.P5, &stats.P10, &stats.P50, &stats.Avg, &stats.SampleCount); err != nil {
+	cacheStats := &service.OpsCacheStats{}
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&stats.P5,
+		&stats.P10,
+		&stats.P50,
+		&stats.Avg,
+		&stats.SampleCount,
+		&cacheStats.CacheReadTokens,
+		&cacheStats.CacheCreationTokens,
+		&cacheStats.InputTokens,
+	); err != nil {
 		// lib/pq reports query cancellation without wrapping the context error.
 		// Preserve deadline vs caller cancellation for the overview's timeout policy.
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+			return nil, nil, ctxErr
 		}
-		return nil, err
+		return nil, nil, err
 	}
-	return &stats, nil
+	denominator := cacheStats.InputTokens + cacheStats.CacheCreationTokens + cacheStats.CacheReadTokens
+	if denominator > 0 {
+		hitRate := float64(cacheStats.CacheReadTokens) / float64(denominator)
+		cacheStats.HitRate = &hitRate
+	}
+	return &stats, cacheStats, nil
 }
 
 func (r *opsRepository) getDashboardOverviewRaw(ctx context.Context, filter *service.OpsDashboardFilter) (*service.OpsDashboardOverview, error) {

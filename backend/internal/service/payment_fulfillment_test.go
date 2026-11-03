@@ -194,6 +194,14 @@ func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateUserOverview(context.C
 	panic("unexpected GetAffiliateUserOverview call")
 }
 
+func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateProfitReport(context.Context, AffiliateProfitFilter) (*AffiliateProfitReport, error) {
+	panic("unexpected GetAffiliateProfitReport call")
+}
+
+func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateProfitOverview(context.Context, AffiliateProfitFilter) (*AffiliateProfitOverview, error) {
+	panic("unexpected GetAffiliateProfitOverview call")
+}
+
 type paymentFulfillmentSettingRepoStub struct {
 	values map[string]string
 }

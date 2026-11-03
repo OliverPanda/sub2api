@@ -27,6 +27,20 @@ func TestAffiliateRecordQueriesUseLedgerAuditFields(t *testing.T) {
 	require.NotContains(t, content, `"current_balance": "u.balance"`)
 }
 
+func TestAffiliateProfitReportUsesInvitedUsageAndEstimatedAccountCost(t *testing.T) {
+	source, err := os.ReadFile("affiliate_repo.go")
+	require.NoError(t, err)
+	content := string(source)
+	start := strings.Index(content, "func (r *affiliateRepository) GetAffiliateProfitReport(")
+	require.NotEqual(t, -1, start)
+	query := content[start:]
+	require.Contains(t, query, "ul.actual_cost > 0")
+	require.Contains(t, query, "invitee_aff.inviter_id IS NOT NULL")
+	require.Contains(t, query, "COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)")
+	require.Contains(t, query, "GROUP BY inviter.id, a.id, ul.channel_id")
+	require.Contains(t, query, "GREATEST(SUM(ul.actual_cost - ")
+}
+
 // TestAffiliateRebateRecordsQueryKeepsNonOrderAccruals 锁定返利记录列出全部
 // accrue 流水：订单与被邀请人均为 LEFT JOIN，且不按 source_order_id 过滤，
 // 兑换码、管理员充值来源的返利才会出现在明细里。

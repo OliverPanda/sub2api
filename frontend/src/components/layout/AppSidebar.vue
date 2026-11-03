@@ -815,6 +815,8 @@ const adminNavItems = computed((): NavItem[] => {
     },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
+    // 推广利润是管理员专用报表，作为独立入口方便快速查看结算数据。
+    { path: '/admin/affiliates/profit', label: t('nav.affiliateProfit'), icon: ChartIcon, hideInSimpleMode: true },
     {
       path: '/admin/affiliates',
       label: t('nav.affiliateManagement'),

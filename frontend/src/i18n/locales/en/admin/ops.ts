@@ -185,6 +185,36 @@ export default {
           requestsWithFirstToken: 'Requests With First Token'
         }
       },
+      ttftRanking: {
+        title: 'TTFT by Group / Channel',
+        hint: 'Aggregated from successful live requests. Channel means the upstream account that handled the request. Percentiles use requests with a recorded first token; compare rows with fewer than 20 samples cautiously.',
+        groups: 'By group',
+        channels: 'By channel account',
+        lowSample: 'Low sample',
+        empty: 'No requests with first-token timing in this time range',
+        failedToLoad: 'Failed to load TTFT ranking',
+        columns: {
+          name: 'Group / channel',
+          platform: 'Platform',
+          request_count: 'Successful requests',
+          sample_count: 'TTFT samples',
+          avg_ms: 'Avg TTFT',
+          p50_ms: 'P50',
+          p95_ms: 'P95',
+          p99_ms: 'P99',
+          max_ms: 'Maximum'
+        }
+      },
+      cacheStats: {
+        title: 'Input Cache Hit Rate',
+        hint: 'Cached-read tokens divided by uncached input + cache writes + cache reads. Token-weighted and aligned with the Token Usage Trend chart; follows the selected time range, platform and group.',
+        inputTokens: 'input tokens',
+        read: 'Cache read',
+        write: 'Cache write',
+        uncached: 'Uncached input',
+        distribution: 'Input token cache composition',
+        empty: 'No input tokens to measure in the selected window'
+      },
       fullscreen: {
         enter: 'Enter Fullscreen'
       },

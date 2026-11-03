@@ -425,6 +425,26 @@ export default {
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
       rebatesDescription: '查看每一笔返利入账，包括充值订单、兑换码和管理员充值产生的返利',
       transfersDescription: '查看返利额度转入余额与线下提现的流水',
+      profit: {
+        description: '按推广人和上游账号汇总被邀请用户的消耗、估算成本和毛利',
+        search: '搜索推广人、邀请码、上游账号或渠道',
+        shareRate: '分成比例',
+        invitees: '被邀请用户',
+        requests: '成功请求',
+        revenue: '用户消耗',
+        estimatedCost: '估算上游成本',
+        grossProfit: '毛利',
+        grossProfitMargin: '毛利率',
+        shareAmount: '预估分成',
+        upstreamAccount: '上游账号',
+        channel: '计费渠道',
+        note: '成本按模型价格和账号成本倍率估算；不含手续费、赠送、退款及其他线下费用。此处比例只用于试算，不修改充值返利设置。',
+        noData: '所选时间范围内没有推广用户的成功用量'
+        ,overviewTitle: '全站毛利率区间'
+        ,overviewNote: '按分组、模型和上游账号汇总全部成功用量，用于评估实际毛利率。'
+        ,group: '分组'
+        ,model: '模型'
+      },
       errors: {
         loadFailed: '加载邀请返利记录失败',
         AFFILIATE_QUOTA_INSUFFICIENT: '可提取返利额度不足',

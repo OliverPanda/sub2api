@@ -99,12 +99,12 @@ func TestOpsOutputTPSDistribution(t *testing.T) {
 		assertStats(overview.OutputTPS)
 	}
 	filter.Platform = service.PlatformAnthropic
-	empty, err := repo.queryOutputTPS(ctx, filter)
+	empty, _, err := repo.queryOutputTPS(ctx, filter)
 	require.NoError(t, err)
 	require.Equal(t, &service.OpsOutputTPS{}, empty)
 	// Ungrouped logs use the account platform; group platform takes precedence.
 	filter.GroupID = nil
-	fallback, err := repo.queryOutputTPS(ctx, filter)
+	fallback, _, err := repo.queryOutputTPS(ctx, filter)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, fallback.SampleCount)
 	require.Equal(t, 50.0, *fallback.P50)
@@ -118,7 +118,8 @@ func TestOpsOutputTPSQueryDeadline(t *testing.T) {
 	defer cancel()
 	repo := NewOpsRepository(integrationDB).(*opsRepository)
 	now := time.Now().UTC()
-	stats, err := repo.queryOutputTPS(ctx, &service.OpsDashboardFilter{StartTime: now.Add(-time.Hour), EndTime: now})
+	stats, cacheStats, err := repo.queryOutputTPS(ctx, &service.OpsDashboardFilter{StartTime: now.Add(-time.Hour), EndTime: now})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, stats)
+	require.Nil(t, cacheStats)
 }

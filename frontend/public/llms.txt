@@ -1,0 +1,18 @@
+# XDDAPI
+
+> XDDAPI is an AI API gateway and usage-management service at https://api.xddapi.org.uk/.
+
+XDDAPI gives users a unified API entry point to the AI model providers configured by the service operator. The platform includes upstream account pooling and scheduling, API key management, usage records, quota controls, and administrator operations tools. Available providers, models, access rules, and prices depend on the live service configuration and are shown in the website after access is granted.
+
+## Public pages
+
+- [Product overview](https://api.xddapi.org.uk/ai-info.html): Public, text-first description of the service, core capabilities, and access path.
+- [Website](https://api.xddapi.org.uk/): XDDAPI home page.
+- [Create an account or sign in](https://api.xddapi.org.uk/login): Access depends on the service's registration settings.
+- [Sitemap](https://api.xddapi.org.uk/sitemap.xml): Indexable public pages.
+
+## Notes
+
+- Do not assume every provider or model is enabled for every user; availability is controlled by the service operator.
+- Pricing, quotas, account eligibility, and model availability can change. Refer to the live website for current details.
+- Administrative pages and API endpoints are not public product documentation.

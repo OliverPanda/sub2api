@@ -278,6 +278,58 @@ func (h *AffiliateHandler) ListTransferRecords(c *gin.Context) {
 	response.Paginated(c, items, total, filter.Page, filter.PageSize)
 }
 
+// ProfitReport aggregates invited users' billed usage and estimated upstream costs.
+// GET /api/v1/admin/affiliates/profit-report
+func (h *AffiliateHandler) ProfitReport(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	shareRate := 30.0
+	if raw := strings.TrimSpace(c.Query("share_rate_percent")); raw != "" {
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			response.BadRequest(c, "Invalid share_rate_percent")
+			return
+		}
+		shareRate = parsed
+	}
+	userTZ := c.Query("timezone")
+	report, err := h.affiliateService.AdminGetProfitReport(c.Request.Context(), service.AffiliateProfitFilter{
+		Search:           c.Query("search"),
+		Page:             page,
+		PageSize:         pageSize,
+		StartAt:          parseAffiliateRecordStartTime(c.Query("start_at"), userTZ),
+		EndAt:            parseAffiliateRecordEndTime(c.Query("end_at"), userTZ),
+		ShareRatePercent: shareRate,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, report)
+}
+
+// ProfitOverview returns site-wide margin breakdown by group, model and upstream account.
+// GET /api/v1/admin/affiliates/profit-overview
+func (h *AffiliateHandler) ProfitOverview(c *gin.Context) {
+	shareRate := 30.0
+	if raw := strings.TrimSpace(c.Query("share_rate_percent")); raw != "" {
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			response.BadRequest(c, "Invalid share_rate_percent")
+			return
+		}
+		shareRate = parsed
+	}
+	o, err := h.affiliateService.AdminGetProfitOverview(c.Request.Context(), service.AffiliateProfitFilter{Search: c.Query("search"), StartAt: parseAffiliateRecordStartTime(c.Query("start_at"), c.Query("timezone")), EndAt: parseAffiliateRecordEndTime(c.Query("end_at"), c.Query("timezone")), ShareRatePercent: shareRate})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, o)
+}
+
 func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.AffiliateRecordFilter {
 	filter := service.AffiliateRecordFilter{
 		Search:   c.Query("search"),

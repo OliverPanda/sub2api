@@ -625,6 +625,174 @@ LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	return items, total, nil
 }
 
+func (r *affiliateRepository) GetAffiliateProfitReport(ctx context.Context, filter service.AffiliateProfitFilter) (*service.AffiliateProfitReport, error) {
+	client := clientFromContext(ctx, r.client)
+	conditions := []string{"ul.actual_cost > 0", "invitee_aff.inviter_id IS NOT NULL"}
+	args := make([]any, 0, 4)
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		placeholder := fmt.Sprintf("$%d", len(args))
+		conditions = append(conditions, "(inviter.email ILIKE "+placeholder+" OR inviter.username ILIKE "+placeholder+" OR inviter_aff.aff_code ILIKE "+placeholder+" OR a.name ILIKE "+placeholder+" OR ch.name ILIKE "+placeholder+")")
+	}
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		conditions = append(conditions, fmt.Sprintf("ul.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		conditions = append(conditions, fmt.Sprintf("ul.created_at <= $%d", len(args)))
+	}
+	where := "WHERE " + strings.Join(conditions, " AND ")
+	from := `
+FROM usage_logs ul
+JOIN user_affiliates invitee_aff ON invitee_aff.user_id = ul.user_id
+JOIN users inviter ON inviter.id = invitee_aff.inviter_id
+JOIN user_affiliates inviter_aff ON inviter_aff.user_id = inviter.id
+JOIN accounts a ON a.id = ul.account_id
+LEFT JOIN channels ch ON ch.id = ul.channel_id
+` + where
+	const costExpr = "COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)"
+
+	total, err := queryAffiliateRecordCount(ctx, client, `SELECT COUNT(*) FROM (
+SELECT 1 `+from+`
+GROUP BY inviter.id, a.id, ul.channel_id
+	) grouped`, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var totals service.AffiliateProfitTotals
+	totalArgs := append(append([]any(nil), args...), filter.ShareRatePercent/100)
+	totalRows, err := client.QueryContext(ctx, `WITH base AS (
+SELECT inviter.id AS inviter_id, invitee_aff.user_id AS invitee_id,
+       a.id AS account_id, ul.channel_id,
+       ul.actual_cost::double precision AS revenue,
+       (`+costExpr+`)::double precision AS estimated_cost
+`+from+`
+	), grouped AS (
+		SELECT inviter_id, account_id, channel_id,
+		       SUM(revenue) AS revenue, SUM(estimated_cost) AS estimated_cost
+		FROM base GROUP BY inviter_id, account_id, channel_id
+	)
+	SELECT (SELECT COUNT(DISTINCT invitee_id) FROM base)::bigint,
+	       (SELECT COUNT(*) FROM base)::bigint,
+	       COALESCE(SUM(revenue), 0)::double precision,
+	       COALESCE(SUM(estimated_cost), 0)::double precision,
+	       COALESCE(SUM(revenue - estimated_cost), 0)::double precision,
+	       COALESCE(SUM(GREATEST(revenue - estimated_cost, 0)) * $`+fmt.Sprint(len(totalArgs))+`, 0)::double precision
+	FROM grouped`, totalArgs...)
+	if err != nil {
+		return nil, err
+	}
+	if totalRows.Next() {
+		if err := totalRows.Scan(&totals.InviteeCount, &totals.RequestCount, &totals.Revenue, &totals.EstimatedCost, &totals.GrossProfit, &totals.ShareAmount); err != nil {
+			_ = totalRows.Close()
+			return nil, err
+		}
+	}
+	if err := totalRows.Err(); err != nil {
+		_ = totalRows.Close()
+		return nil, err
+	}
+	if err := totalRows.Close(); err != nil {
+		return nil, err
+	}
+
+	itemsArgs := append(append([]any(nil), args...), filter.ShareRatePercent/100, filter.PageSize, (filter.Page-1)*filter.PageSize)
+	limitArg := len(args) + 2
+	offsetArg := len(args) + 3
+	rows, err := client.QueryContext(ctx, `SELECT inviter.id,
+       COALESCE(inviter.email, ''),
+       COALESCE(inviter.username, ''),
+       COALESCE(inviter_aff.aff_code, ''),
+       a.id,
+       a.name,
+       ul.channel_id,
+       COALESCE(ch.name, ''),
+       COUNT(DISTINCT invitee_aff.user_id)::bigint,
+       COUNT(*)::bigint,
+       SUM(ul.actual_cost)::double precision,
+       SUM(`+costExpr+`)::double precision,
+       SUM(ul.actual_cost - `+costExpr+`)::double precision,
+GREATEST(SUM(ul.actual_cost - `+costExpr+`), 0) * $`+fmt.Sprint(len(args)+1)+`::double precision
+`+from+`
+GROUP BY inviter.id, inviter.email, inviter.username, inviter_aff.aff_code, a.id, a.name, ul.channel_id, ch.name
+ORDER BY inviter.email, a.name, ch.name
+LIMIT $`+fmt.Sprint(limitArg)+` OFFSET $`+fmt.Sprint(offsetArg), itemsArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	items := make([]service.AffiliateProfitRow, 0)
+	for rows.Next() {
+		var item service.AffiliateProfitRow
+		var channelID sql.NullInt64
+		if err := rows.Scan(
+			&item.InviterID, &item.InviterEmail, &item.InviterUsername, &item.AffCode,
+			&item.AccountID, &item.AccountName, &channelID, &item.ChannelName,
+			&item.InviteeCount, &item.RequestCount, &item.Revenue, &item.EstimatedCost,
+			&item.GrossProfit, &item.ShareAmount,
+		); err != nil {
+			return nil, err
+		}
+		if channelID.Valid {
+			item.ChannelID = &channelID.Int64
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &service.AffiliateProfitReport{
+		Items: items, Total: total, Page: filter.Page, PageSize: filter.PageSize,
+		ShareRate: filter.ShareRatePercent, Totals: totals,
+	}, nil
+}
+
+// GetAffiliateProfitOverview aggregates all successful billed usage by group/model/account.
+func (r *affiliateRepository) GetAffiliateProfitOverview(ctx context.Context, filter service.AffiliateProfitFilter) (*service.AffiliateProfitOverview, error) {
+	client := clientFromContext(ctx, r.client)
+	conditions := []string{"ul.actual_cost > 0"}
+	args := make([]any, 0, 3)
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		p := fmt.Sprintf("$%d", len(args))
+		conditions = append(conditions, "(g.name ILIKE "+p+" OR ul.model ILIKE "+p+" OR a.name ILIKE "+p+" OR ch.name ILIKE "+p+")")
+	}
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		conditions = append(conditions, fmt.Sprintf("ul.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		conditions = append(conditions, fmt.Sprintf("ul.created_at <= $%d", len(args)))
+	}
+	where := "WHERE " + strings.Join(conditions, " AND ")
+	costExpr := "COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)"
+	from := "FROM usage_logs ul LEFT JOIN groups g ON g.id = ul.group_id JOIN accounts a ON a.id = ul.account_id LEFT JOIN channels ch ON ch.id = ul.channel_id " + where
+	rows, err := client.QueryContext(ctx, `SELECT COALESCE(g.name,''), COALESCE(ul.model,''), COALESCE(a.name,''), COALESCE(ch.name,''), COUNT(*)::bigint, SUM(ul.actual_cost)::double precision, SUM(`+costExpr+`)::double precision, SUM(ul.actual_cost-`+costExpr+`)::double precision `+from+` GROUP BY g.name, ul.model, a.name, ch.name ORDER BY SUM(ul.actual_cost) DESC`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	o := &service.AffiliateProfitOverview{Items: make([]service.AffiliateProfitOverviewRow, 0)}
+	for rows.Next() {
+		var x service.AffiliateProfitOverviewRow
+		if err := rows.Scan(&x.GroupName, &x.Model, &x.AccountName, &x.ChannelName, &x.RequestCount, &x.Revenue, &x.EstimatedCost, &x.GrossProfit); err != nil {
+			return nil, err
+		}
+		o.Items = append(o.Items, x)
+		o.Totals.RequestCount += x.RequestCount
+		o.Totals.Revenue += x.Revenue
+		o.Totals.EstimatedCost += x.EstimatedCost
+		o.Totals.GrossProfit += x.GrossProfit
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
 func (r *affiliateRepository) ListAffiliateRebateRecords(ctx context.Context, filter service.AffiliateRecordFilter) ([]service.AffiliateRebateRecord, int64, error) {
 	client := clientFromContext(ctx, r.client)
 	where, args := buildAffiliateRecordWhere(filter, "ual.created_at", []string{

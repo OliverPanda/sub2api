@@ -290,6 +290,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		ops.GET("/dashboard/error-trend", h.Admin.Ops.GetDashboardErrorTrend)
 		ops.GET("/dashboard/error-distribution", h.Admin.Ops.GetDashboardErrorDistribution)
 		ops.GET("/dashboard/openai-token-stats", h.Admin.Ops.GetDashboardOpenAITokenStats)
+		ops.GET("/dashboard/ttft-ranking", h.Admin.Ops.GetDashboardTTFTRanking)
 	}
 }
 
@@ -841,6 +842,8 @@ func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		affiliates.GET("/invites", h.Admin.Affiliate.ListInviteRecords)
 		affiliates.GET("/rebates", h.Admin.Affiliate.ListRebateRecords)
 		affiliates.GET("/transfers", h.Admin.Affiliate.ListTransferRecords)
+		affiliates.GET("/profit-report", h.Admin.Affiliate.ProfitReport)
+		affiliates.GET("/profit-overview", h.Admin.Affiliate.ProfitOverview)
 
 		users := affiliates.Group("/users")
 		{

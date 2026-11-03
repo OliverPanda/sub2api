@@ -70,9 +70,17 @@ export interface OpsDashboardOverview {
     avg: number | null
     sample_count: number
   } | null
+  cache_stats?: OpsCacheStats | null
 
   duration: OpsPercentiles
   ttft: OpsPercentiles
+}
+
+export interface OpsCacheStats {
+  input_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  hit_rate: number | null
 }
 
 export interface OpsPercentiles {
@@ -251,6 +259,36 @@ export interface OpsOpenAITokenStatsParams {
   page?: number
   page_size?: number
   top_n?: number
+}
+
+export type OpsTTFTRankingDimension = 'group' | 'account'
+export type OpsTTFTRankingTimeRange = '5m' | '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
+
+export interface OpsTTFTRankingItem {
+  id: number
+  name: string
+  platform: string
+  request_count: number
+  sample_count: number
+  avg_ms?: number | null
+  p50_ms?: number | null
+  p95_ms?: number | null
+  p99_ms?: number | null
+  max_ms?: number | null
+}
+
+export interface OpsTTFTRankingResponse {
+  start_time: string
+  end_time: string
+  dimension: OpsTTFTRankingDimension
+  platform?: string
+  items: OpsTTFTRankingItem[]
+}
+
+export interface OpsTTFTRankingParams {
+  time_range: OpsTTFTRankingTimeRange
+  dimension: OpsTTFTRankingDimension
+  platform?: string
 }
 
 export interface OpsSystemMetricsSnapshot {
@@ -1090,6 +1128,11 @@ export async function getOpenAITokenStats(
   return data
 }
 
+export async function getTTFTRanking(params: OpsTTFTRankingParams): Promise<OpsTTFTRankingResponse> {
+  const { data } = await apiClient.get<OpsTTFTRankingResponse>('/admin/ops/dashboard/ttft-ranking', { params })
+  return data
+}
+
 export type OpsErrorListView = 'errors' | 'excluded' | 'all'
 
 export type OpsErrorListQueryParams = {
@@ -1324,6 +1367,7 @@ export const opsAPI = {
   getErrorTrend,
   getErrorDistribution,
   getOpenAITokenStats,
+  getTTFTRanking,
   getConcurrencyStats,
   getUserConcurrencyStats,
   getAccountAvailabilityStats,

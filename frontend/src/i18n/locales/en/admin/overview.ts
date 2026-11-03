@@ -425,6 +425,26 @@ export default {
       invitesDescription: 'View site-wide inviter and invitee relationships',
       rebatesDescription: 'View every affiliate rebate accrual from recharge orders, redeem codes, and admin recharges',
       transfersDescription: 'View affiliate quota transfers into balance and offline withdrawals',
+      profit: {
+        description: 'Aggregate invited users’ billed usage, estimated costs, and gross profit by promoter and upstream account',
+        search: 'Search promoter, invite code, upstream account, or channel',
+        shareRate: 'Share rate',
+        invitees: 'Invited users',
+        requests: 'Successful requests',
+        revenue: 'User spend',
+        estimatedCost: 'Estimated upstream cost',
+        grossProfit: 'Gross profit',
+        grossProfitMargin: 'Gross margin',
+        shareAmount: 'Estimated share',
+        upstreamAccount: 'Upstream account',
+        channel: 'Billing channel',
+        note: 'Costs use model pricing and the account cost multiplier. Fees, bonuses, refunds, and other off-platform costs are excluded. This rate is for estimation and does not change recharge rebates.',
+        noData: 'No successful invited-user usage in this date range'
+        ,overviewTitle: 'Site-wide margin range'
+        ,overviewNote: 'All successful usage grouped by billing group, model, and upstream account.'
+        ,group: 'Group'
+        ,model: 'Model'
+      },
       errors: {
         loadFailed: 'Failed to load affiliate records',
         AFFILIATE_QUOTA_INSUFFICIENT: 'Insufficient available affiliate quota',

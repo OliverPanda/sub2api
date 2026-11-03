@@ -181,6 +181,36 @@ export default {
           requestsWithFirstToken: '首 Token 样本数'
         }
       },
+      ttftRanking: {
+        title: '分组 / 渠道首 Token 延迟排名',
+        hint: '按真实成功请求统计；渠道维度指实际承载请求的上游账号。仅有首 Token 记录的请求参与延迟分位数，样本少于 20 条时谨慎比较。',
+        groups: '按分组',
+        channels: '按渠道账号',
+        lowSample: '样本少',
+        empty: '当前时间范围内没有首 Token 请求数据',
+        failedToLoad: '加载首 Token 延迟排名失败',
+        columns: {
+          name: '分组 / 渠道',
+          platform: '平台',
+          request_count: '成功请求',
+          sample_count: '首 Token 样本',
+          avg_ms: '平均 TTFT',
+          p50_ms: 'P50',
+          p95_ms: 'P95',
+          p99_ms: 'P99',
+          max_ms: '最大值'
+        }
+      },
+      cacheStats: {
+        title: '输入缓存命中率',
+        hint: '缓存读取 Token ÷（未缓存输入 + 缓存写入 + 缓存读取）。按 Token 加权，与 Token 使用趋势图的统计口径一致；受当前时间、平台和分组筛选影响。',
+        inputTokens: '输入 Token',
+        read: '缓存读取',
+        write: '缓存写入',
+        uncached: '未缓存输入',
+        distribution: '输入 Token 缓存构成',
+        empty: '当前筛选窗口内没有可统计的输入 Token'
+      },
       customTimeRange: {
         startTime: '开始时间',
         endTime: '结束时间'

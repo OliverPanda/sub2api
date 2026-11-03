@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /keys
+Disallow: /usage
+Disallow: /affiliate
+Disallow: /settings/
+Disallow: /api/
+Disallow: /v1/
+Disallow: /backend-api/
+Disallow: /auth/
+Disallow: /payment/
+Disallow: /setup
+
+Sitemap: https://api.xddapi.org.uk/sitemap.xml

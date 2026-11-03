@@ -247,6 +247,35 @@ func (h *OpsHandler) GetDashboardOpenAITokenStats(c *gin.Context) {
 	response.Success(c, data)
 }
 
+// GetDashboardTTFTRanking returns real-request TTFT percentiles grouped by group or upstream account.
+// GET /api/v1/admin/ops/dashboard/ttft-ranking
+func (h *OpsHandler) GetDashboardTTFTRanking(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	startTime, endTime, err := parseOpsTimeRange(c, "1h")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	dimension := service.OpsTTFTRankingDimension(strings.TrimSpace(c.Query("dimension")))
+	if dimension == "" {
+		dimension = service.OpsTTFTRankingByGroup
+	}
+	data, err := h.opsService.GetTTFTRanking(c.Request.Context(), &service.OpsTTFTRankingFilter{
+		StartTime: startTime,
+		EndTime:   endTime,
+		Dimension: dimension,
+		Platform:  strings.TrimSpace(c.Query("platform")),
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, data)
+}
+
 func parseOpsOpenAITokenStatsFilter(c *gin.Context) (*service.OpsOpenAITokenStatsFilter, error) {
 	if c == nil {
 		return nil, fmt.Errorf("invalid request")
