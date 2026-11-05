@@ -69,7 +69,7 @@ func TestOpsOutputTPSOverviewFailurePolicy(t *testing.T) {
 
 func TestOpsCacheHitRateUsesTokenWeightedTotals(t *testing.T) {
 	db, mock := newSQLMock(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	repo := &opsRepository{db: db}
 	now := time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
 	mock.ExpectQuery(`percentile_cont\(0.05\)`).WillReturnRows(

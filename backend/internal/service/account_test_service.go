@@ -312,11 +312,6 @@ func generateSessionString() (string, error) {
 	return FormatMetadataUserID(hex64, "", sessionUUID, uaVersion), nil
 }
 
-// createTestPayload creates a Claude Code style test request payload.
-func createTestPayload(modelID string) (map[string]any, error) {
-	return createTestPayloadWithPrompt(modelID, "")
-}
-
 // createTestPayloadWithPrompt keeps the connectivity probe backwards compatible
 // for an empty prompt while allowing batch tests to request substantial output.
 func createTestPayloadWithPrompt(modelID, prompt string) (map[string]any, error) {

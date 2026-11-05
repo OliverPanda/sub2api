@@ -774,7 +774,7 @@ func (r *affiliateRepository) GetAffiliateProfitOverview(ctx context.Context, fi
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	o := &service.AffiliateProfitOverview{Items: make([]service.AffiliateProfitOverviewRow, 0)}
 	for rows.Next() {
 		var x service.AffiliateProfitOverviewRow
