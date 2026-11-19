@@ -53,7 +53,7 @@ func CanonicalGrokImagineVideoPriceFamily(model string) string {
 }
 
 // NormalizeVideoModelPrices cleans and canonicalizes a per-model resolution map.
-// Keys become price families; tiers use 480p/720p/1080p. Negative prices dropped.
+// Keys become price families; tiers use 480p/720p/768p/1080p/2k. Negative prices dropped.
 //
 // Model keys are walked in sorted order rather than in Go map order: several
 // aliases can canonicalize onto the same family, and an unordered walk would
@@ -102,7 +102,7 @@ func NormalizeVideoModelPrices(in map[string]map[string]float64) map[string]map[
 			if price < 0 {
 				continue
 			}
-			tier, ok := LookupVideoBillingResolution(tierKey)
+			tier, ok := LookupCompatibleVideoBillingResolution(tierKey)
 			if !ok {
 				slog.Warn("video_model_prices_unknown_resolution_dropped",
 					"model_key", modelKey,
@@ -146,7 +146,10 @@ func LookupVideoModelPrice(prices map[string]map[string]float64, model, resoluti
 	if !ok || len(tierPrices) == 0 {
 		return nil
 	}
-	tier := NormalizeVideoBillingResolutionOrDefault(resolution)
+	tier, valid := LookupCompatibleVideoBillingResolution(resolution)
+	if !valid {
+		return nil
+	}
 	if price, ok := tierPrices[tier]; ok {
 		p := price
 		return &p

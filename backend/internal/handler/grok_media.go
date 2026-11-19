@@ -128,7 +128,12 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
 
 	if endpoint.IsGenerationRequest() {
-		if !service.GroupAllowsImageGeneration(apiKey.Group) {
+		videoEntitlement := endpoint.IsSeedance() && strings.Contains(c.Request.URL.Path, "/videos")
+		if videoEntitlement && !service.GroupAllowsVideoGeneration(apiKey.Group) {
+			h.errorResponse(c, http.StatusForbidden, "permission_error", service.VideoGenerationPermissionMessage())
+			return
+		}
+		if !videoEntitlement && !service.GroupAllowsImageGeneration(apiKey.Group) {
 			h.errorResponse(c, http.StatusForbidden, "permission_error", service.ImageGenerationPermissionMessage())
 			return
 		}

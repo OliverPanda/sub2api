@@ -1917,10 +1917,15 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	if a == nil {
 		return false
 	}
-	if capability == OpenAIEndpointCapabilitySeedance {
+	if capability == OpenAIEndpointCapabilitySeedance || capability == OpenAIEndpointCapabilityVideoGeneration {
 		configured, _ := a.openAIEndpointCapabilitySet()
-		return configured["seedance"] && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey &&
+		return configured[string(capability)] && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey &&
 			strings.TrimSpace(a.GetCredential("base_url")) != ""
+	}
+	if capability == OpenAIEndpointCapabilityMusicGeneration {
+		configured, _ := a.openAIEndpointCapabilitySet()
+		return configured[string(capability)] && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey &&
+			strings.TrimSpace(a.GetCredential("base_url")) != "" && strings.TrimSpace(a.GetCredential("api_key")) != ""
 	}
 	if capability == "" {
 		return true

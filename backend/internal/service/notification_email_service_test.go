@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -141,6 +142,7 @@ func TestNotificationEmailAdditionalEventsAreListedAndPreviewable(t *testing.T) 
 	}{
 		{NotificationEmailEventNotificationEmailVerifyCode, "verification_code"},
 		{NotificationEmailEventAccountQuotaAlert, "account_name"},
+		{NotificationEmailEventAccountBalanceLow, "stopped_until"},
 		{NotificationEmailEventContentModerationViolation, "moderation_category"},
 		{NotificationEmailEventContentModerationDisabled, "violation_count"},
 		{NotificationEmailEventCyberPolicyNotice, "upstream_message"},
@@ -455,6 +457,37 @@ func TestNotificationEmailSendDeduplicatesSubscriptionExpiryReminder(t *testing.
 	require.NoError(t, err)
 
 	require.NoError(t, svc.Send(ctx, input))
+	require.Equal(t, int64(1), smtpServer.messageCount())
+}
+
+func TestNotifyUpstreamBalanceLowSendsDeduplicatedAdminEmail(t *testing.T) {
+	ctx := context.Background()
+	repo := newNotificationEmailMemorySettingRepo()
+	smtpServer := startNotificationEmailTestSMTPServer(t)
+	require.NoError(t, repo.SetMultiple(ctx, smtpServer.settings()))
+	require.NoError(t, repo.Set(ctx, SettingKeyAccountQuotaNotifyEnabled, "true"))
+	require.NoError(t, repo.Set(ctx, SettingKeyAccountQuotaNotifyEmails, MarshalNotifyEmails([]NotifyEmailEntry{{
+		Email: "admin@example.com", Verified: true,
+	}})))
+
+	emailService := NewEmailService(repo, nil)
+	notificationService := NewNotificationEmailService(repo, emailService)
+	notificationService.RememberRecipientLocale(ctx, 0, "admin@example.com", "zh-CN")
+	service := NewBalanceNotifyService(emailService, repo, nil)
+	service.SetNotificationEmailService(notificationService)
+	account := &Account{ID: 701, Name: "zhipu-prod", Platform: PlatformZhipu}
+	stoppedUntil := time.Now().Add(20 * time.Minute)
+
+	service.NotifyUpstreamBalanceLow(account, "余额不足，请充值", stoppedUntil)
+	require.Eventually(t, func() bool { return smtpServer.messageCount() == 1 }, 2*time.Second, 10*time.Millisecond)
+	body := smtpServer.lastMessageBody(t)
+	require.Contains(t, body, "zhipu-prod")
+	require.Contains(t, body, "余额不足，请充值")
+	require.Contains(t, body, "下次余额检查时间")
+	require.Contains(t, body, "已暂停")
+
+	service.NotifyUpstreamBalanceLow(account, "余额不足，请充值", stoppedUntil)
+	time.Sleep(50 * time.Millisecond)
 	require.Equal(t, int64(1), smtpServer.messageCount())
 }
 

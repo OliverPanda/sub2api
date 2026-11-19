@@ -17,10 +17,13 @@ var ErrUsageBillingRequestConflict = errors.New("usage billing request fingerpri
 
 // UsageBillingCommand describes one billable request that must be applied at most once.
 type UsageBillingCommand struct {
-	RequestID          string
-	APIKeyID           int64
-	RequestFingerprint string
-	RequestPayloadHash string
+	CompatibleVideoTaskID string
+	ReplicateMusicTaskID  string
+	ReplicateMusicOutput  []byte
+	RequestID             string
+	APIKeyID              int64
+	RequestFingerprint    string
+	RequestPayloadHash    string
 
 	UserID              int64
 	AccountID           int64
@@ -136,6 +139,12 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 	)
 	if payloadHash := strings.TrimSpace(c.RequestPayloadHash); payloadHash != "" {
 		raw += "|" + payloadHash
+	}
+	if c.CompatibleVideoTaskID != "" {
+		raw += "|video:" + c.CompatibleVideoTaskID
+	}
+	if c.ReplicateMusicTaskID != "" {
+		raw += "|music:" + c.ReplicateMusicTaskID
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

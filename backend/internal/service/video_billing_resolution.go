@@ -55,3 +55,19 @@ func NormalizeVideoBillingResolutionOrDefault(resolution string) string {
 	}
 	return VideoBillingResolution480P
 }
+
+// Compatible adapters expose additional quality tiers. Keep xAI's legacy
+// fallback behavior separate so unknown native tiers do not change semantics.
+func LookupCompatibleVideoBillingResolution(resolution string) (string, bool) {
+	if tier, ok := LookupVideoBillingResolution(resolution); ok {
+		return tier, true
+	}
+	switch strings.ToLower(strings.TrimSpace(resolution)) {
+	case "768", "768p":
+		return "768p", true
+	case "2k":
+		return "2k", true
+	default:
+		return "", false
+	}
+}

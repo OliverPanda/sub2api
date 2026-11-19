@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -1290,6 +1291,39 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 }
 
 func (s *adminServiceImpl) DeleteAccount(ctx context.Context, id int64) error {
+	if s.entClient != nil {
+		tx, err := s.entClient.Tx(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+		txctx := dbent.NewTxContext(ctx, tx)
+		shadows, err := s.accountRepo.ListShadowsByParent(txctx, id)
+		if err != nil {
+			return fmt.Errorf("list spark shadows for cascade delete: %w", err)
+		}
+		for _, shadow := range shadows {
+			if err := s.accountRepo.Delete(txctx, shadow.ID); err != nil {
+				return fmt.Errorf("cascade delete spark shadow %d: %w", shadow.ID, err)
+			}
+		}
+		if err := s.accountRepo.Delete(txctx, id); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		if repo, ok := s.accountRepo.(interface {
+			ScopedAdminCommitted(context.Context, int64, bool)
+		}); ok {
+			for _, shadow := range shadows {
+				repo.ScopedAdminCommitted(ctx, shadow.ID, true)
+			}
+			repo.ScopedAdminCommitted(ctx, id, true)
+		}
+		return nil
+	}
+
 	// 级联删除 spark 影子账号（先删影子，再删母账号）
 	shadows, err := s.accountRepo.ListShadowsByParent(ctx, id)
 	if err != nil {

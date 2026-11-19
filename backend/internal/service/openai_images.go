@@ -639,8 +639,13 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		return nil, err
 	}
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateCompatibleImagesModel(upstreamModel); err != nil {
-		return nil, err
+	// Custom API-key gateways (e.g. LiteLLM) use operator-defined aliases.
+	// The public model was validated above; allow its configured upstream alias
+	// while retaining the native model guard for the official OpenAI endpoint.
+	if strings.TrimSpace(account.GetCredential("base_url")) == "" || isOfficialOpenAIModelsBaseURL(account.GetCredential("base_url")) {
+		if err := validateCompatibleImagesModel(upstreamModel); err != nil {
+			return nil, err
+		}
 	}
 	SetOpsUpstreamModel(c, upstreamModel)
 	logger.LegacyPrintf(

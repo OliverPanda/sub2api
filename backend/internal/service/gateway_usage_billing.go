@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -73,16 +74,20 @@ type usageLogBestEffortWriter interface {
 
 // postUsageBillingParams 统一扣费所需的参数
 type postUsageBillingParams struct {
-	Cost                  *CostBreakdown
-	User                  *User
-	APIKey                *APIKey
-	Account               *Account
-	Subscription          *UserSubscription
-	RequestPayloadHash    string
-	IsSubscriptionBill    bool
-	AccountRateMultiplier float64
-	APIKeyService         APIKeyQuotaUpdater
-	Platform              string // 来自 APIKey 关联 Group 的平台标识
+	CompatibleVideoTaskID  string
+	ReplicateMusicTaskID   string
+	ReplicateMusicOutput   json.RawMessage
+	BalanceAlreadyReserved bool
+	Cost                   *CostBreakdown
+	User                   *User
+	APIKey                 *APIKey
+	Account                *Account
+	Subscription           *UserSubscription
+	RequestPayloadHash     string
+	IsSubscriptionBill     bool
+	AccountRateMultiplier  float64
+	APIKeyService          APIKeyQuotaUpdater
+	Platform               string // 来自 APIKey 关联 Group 的平台标识
 	// SimpleModeKeyRateLimitOnly opts the request into the simple-mode billing
 	// path that records only API-key 5h/1d/7d window usage. It must not trigger
 	// balance, subscription, account, platform, or lifetime-key-quota effects.
@@ -129,11 +134,11 @@ func QuotaPlatform(ctx context.Context, apiKey *APIKey) string {
 }
 
 func (p *postUsageBillingParams) shouldDeductAPIKeyQuota() bool {
-	return p.Cost.ActualCost > 0 && p.APIKey.Quota > 0 && p.APIKeyService != nil
+	return p.Cost.ActualCost > 0 && p.APIKey.Quota > 0 && (p.APIKeyService != nil || p.CompatibleVideoTaskID != "")
 }
 
 func (p *postUsageBillingParams) shouldUpdateRateLimits() bool {
-	return p.Cost.ActualCost > 0 && p.APIKey.HasRateLimits() && p.APIKeyService != nil
+	return p.Cost.ActualCost > 0 && p.APIKey.HasRateLimits() && (p.APIKeyService != nil || p.CompatibleVideoTaskID != "")
 }
 
 func (p *postUsageBillingParams) shouldUpdateAccountQuota() bool {
@@ -240,6 +245,7 @@ func isForcedUsageBillingRequestID(requestID string) bool {
 	id := strings.TrimSpace(requestID)
 	return strings.HasPrefix(id, "web_search:") ||
 		strings.HasPrefix(id, "grok-video:") ||
+		strings.HasPrefix(id, "compatible-video:") ||
 		strings.HasPrefix(id, "grok_audio:") ||
 		strings.HasPrefix(id, "grok_realtime:") ||
 		strings.HasPrefix(id, GeminiCachedContentUsageRequestIDPrefix)
@@ -292,12 +298,15 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 
 	cmd := &UsageBillingCommand{
-		RequestID:          requestID,
-		APIKeyID:           p.APIKey.ID,
-		UserID:             p.User.ID,
-		AccountID:          p.Account.ID,
-		AccountType:        p.Account.Type,
-		RequestPayloadHash: strings.TrimSpace(p.RequestPayloadHash),
+		CompatibleVideoTaskID: p.CompatibleVideoTaskID,
+		ReplicateMusicTaskID:  p.ReplicateMusicTaskID,
+		ReplicateMusicOutput:  append([]byte(nil), p.ReplicateMusicOutput...),
+		RequestID:             requestID,
+		APIKeyID:              p.APIKey.ID,
+		UserID:                p.User.ID,
+		AccountID:             p.Account.ID,
+		AccountType:           p.Account.Type,
+		RequestPayloadHash:    strings.TrimSpace(p.RequestPayloadHash),
 	}
 	if usageLog != nil {
 		cmd.Model = usageLog.Model
@@ -333,7 +342,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
-	} else if p.Cost.ActualCost > 0 {
+	} else if p.Cost.ActualCost > 0 && !p.BalanceAlreadyReserved {
 		cmd.BalanceCost = p.Cost.ActualCost
 	}
 
@@ -416,7 +425,12 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
-		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
+		if (p.CompatibleVideoTaskID != "" || p.BalanceAlreadyReserved) && deps.billingCacheService != nil {
+			// The reservation already reduced spendable balance; capture must not subtract twice in Redis.
+			_ = deps.billingCacheService.InvalidateUserBalance(ctx, p.User.ID)
+		} else {
+			syncBalanceCacheAfterDeduction(ctx, p, deps, result)
+		}
 	}
 
 	if p.Cost.ActualCost > 0 && p.APIKey != nil && p.APIKey.HasRateLimits() && deps.billingCacheService != nil {

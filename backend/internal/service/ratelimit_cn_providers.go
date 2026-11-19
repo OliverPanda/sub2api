@@ -227,6 +227,9 @@ func (s *RateLimitService) handleCNProviderInsufficientBalance(
 		slog.Warn("cn_balance_set_temp_unschedulable_failed", "account_id", account.ID, "error", err)
 		return
 	}
+	if s.balanceNotifyService != nil {
+		s.balanceNotifyService.NotifyUpstreamBalanceLow(account, upstreamMsg, until)
+	}
 	slog.Info("cn_provider_insufficient_balance",
 		"account_id", account.ID,
 		"platform", account.Platform,

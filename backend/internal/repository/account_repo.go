@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -1010,6 +1011,22 @@ func (r *accountRepository) Delete(ctx context.Context, id int64) error {
 		// 已处于外部事务中（ErrTxStarted），复用当前 client
 		txClient = r.client
 	}
+	accountRows, err := txClient.QueryContext(ctx, "SELECT id FROM accounts WHERE id = $1 FOR UPDATE", id)
+	if err != nil {
+		return err
+	}
+	if !accountRows.Next() {
+		_ = accountRows.Close()
+		return service.ErrAccountNotFound
+	}
+	if err := accountRows.Close(); err != nil {
+		return err
+	}
+	if pending, err := hasPendingMediaTasks(ctx, txClient, id); err != nil {
+		return err
+	} else if pending {
+		return service.ErrAccountHasPendingMediaTasks
+	}
 
 	if _, err := txClient.AccountGroup.Delete().Where(dbaccountgroup.AccountIDEQ(id)).Exec(ctx); err != nil {
 		return err
@@ -1031,6 +1048,40 @@ func (r *accountRepository) Delete(ctx context.Context, id int64) error {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue account delete failed: account=%d err=%v", id, err)
 	}
 	return nil
+}
+
+func hasPendingMediaTasks(ctx context.Context, exec sqlExecutor, accountID int64) (bool, error) {
+	rows, err := exec.QueryContext(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name IN ('compatible_video_tasks','replicate_music_tasks')`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	var tables []string
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			return false, err
+		}
+		tables = append(tables, tableName)
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	for _, tableName := range tables {
+		rows, err := exec.QueryContext(ctx, fmt.Sprintf("SELECT 1 FROM %s WHERE account_id=$1 AND NOT settled LIMIT 1", tableName), accountID)
+		if err != nil {
+			return false, err
+		}
+		hasTask := rows.Next()
+		closeErr := rows.Close()
+		if closeErr != nil {
+			return false, closeErr
+		}
+		if hasTask {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *accountRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.Account, *pagination.PaginationResult, error) {

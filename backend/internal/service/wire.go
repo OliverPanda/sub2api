@@ -511,6 +511,7 @@ func ProvideRateLimitService(
 	timeoutCounterCache TimeoutCounterCache,
 	openAI403CounterCache OpenAI403CounterCache,
 	settingService *SettingService,
+	balanceNotifyService *BalanceNotifyService,
 	tokenCacheInvalidator TokenCacheInvalidator,
 	ollamaCloudUsage *OllamaCloudUsageService,
 ) *RateLimitService {
@@ -521,6 +522,7 @@ func ProvideRateLimitService(
 	svc.SetTimeoutCounterCache(timeoutCounterCache)
 	svc.SetOpenAI403CounterCache(openAI403CounterCache)
 	svc.SetSettingService(settingService)
+	svc.SetBalanceNotifyService(balanceNotifyService)
 	svc.SetTokenCacheInvalidator(tokenCacheInvalidator)
 	svc.SetOllamaCloudUsageProbeScheduler(ollamaCloudUsage)
 	return svc
