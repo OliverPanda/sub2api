@@ -19,9 +19,11 @@ describe("groups image pricing platform support", () => {
     expect(imagePricingPlatforms.has("grok")).toBe(true);
   });
 
-  it("enables video pricing controls for Grok only", () => {
+  it("enables video pricing controls for Grok and compatible gateways", () => {
     expect(supportsVideoPricingPlatform("grok")).toBe(true);
-    expect(supportsVideoPricingPlatform("openai")).toBe(false);
+    expect(supportsVideoPricingPlatform("openai")).toBe(true);
+    expect(supportsVideoPricingPlatform("composite")).toBe(true);
+    expect(supportsVideoPricingPlatform("anthropic")).toBe(false);
   });
 
   it("keeps non-media group platforms out of the image pricing controls", () => {

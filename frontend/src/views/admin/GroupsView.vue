@@ -1139,17 +1139,21 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
             </p>
+            <div class="mt-3 flex gap-2">
+              <input v-model="createVideoModelName" class="input" :placeholder="t('admin.groups.videoPricing.modelNamePlaceholder')" />
+              <button type="button" class="btn btn-secondary whitespace-nowrap" @click="addVideoModelPrice(createForm.video_model_prices, createVideoModelName) && (createVideoModelName = '')">{{ t('admin.groups.videoPricing.addModel') }}</button>
+            </div>
             <div class="mt-3 space-y-3">
               <div
                 v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
                 :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
+                class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:items-end"
               >
                 <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
                   {{ family.label }}
                 </div>
                 <label
-                  v-for="resolution in grokVideoPriceResolutions"
+                  v-for="resolution in videoPriceResolutions(createForm.platform, family.key)"
                   :key="resolution.key"
                   class="block"
                 >
@@ -2793,17 +2797,21 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
             </p>
+            <div class="mt-3 flex gap-2">
+              <input v-model="editVideoModelName" class="input" :placeholder="t('admin.groups.videoPricing.modelNamePlaceholder')" />
+              <button type="button" class="btn btn-secondary whitespace-nowrap" @click="addVideoModelPrice(editForm.video_model_prices, editVideoModelName) && (editVideoModelName = '')">{{ t('admin.groups.videoPricing.addModel') }}</button>
+            </div>
             <div class="mt-3 space-y-3">
               <div
                 v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
                 :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
+                class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:items-end"
               >
                 <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
                   {{ family.label }}
                 </div>
                 <label
-                  v-for="resolution in grokVideoPriceResolutions"
+                  v-for="resolution in videoPriceResolutions(editForm.platform, family.key)"
                   :key="resolution.key"
                   class="block"
                 >
@@ -4404,7 +4412,8 @@ import {
 } from "./groupsImagePricing";
 import {
   createVideoModelPricesForm,
-  grokVideoPriceResolutions,
+  addVideoModelPrice,
+  videoPriceResolutions,
   serializeVideoModelPrices,
   videoModelPriceFamilyRows,
 } from "./groupsVideoModelPricing";
@@ -4969,6 +4978,8 @@ const submitEditAllowlistCustomEntry = () => {
   }
 };
 
+const createVideoModelName = ref('');
+const editVideoModelName = ref('');
 const createForm = reactive({
   name: "",
   description: "",
