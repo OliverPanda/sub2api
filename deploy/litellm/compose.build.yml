@@ -1,0 +1,8 @@
+# docker compose --env-file .env -f compose.yml -f compose.build.yml build
+# Test the built image before `up`; see docs/LITELLM_MEDIA_GATEWAY.md.
+services:
+  litellm:
+    build:
+      context: .
+      args:
+        LITELLM_VERSION: "1.110.0"
