@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -143,42 +142,12 @@ func (s *OpenAIGatewayService) ForwardSeedance(ctx context.Context, c *gin.Conte
 			return nil, fmt.Errorf("seedance create response missing task ID")
 		}
 		result.ResponseID = SeedanceTaskKey(id)
-		if strings.Contains(c.Request.URL.Path, "/videos") {
-			responseBody, err = sjson.SetBytes(responseBody, "id", result.ResponseID)
-			if err != nil {
-				return nil, err
-			}
-		}
 	}
 	if endpoint == SeedanceEndpointStatus {
 		result.ResponseID = taskID
 		result.UpstreamModel = gjson.GetBytes(responseBody, "model").String()
 		if gjson.GetBytes(responseBody, "status").String() == "succeeded" {
 			result.Usage.OutputTokens = max(0, int(gjson.GetBytes(responseBody, "usage.completion_tokens").Int()))
-		}
-		unifiedVideoPath := strings.Contains(c.Request.URL.Path, "/videos")
-		if unifiedVideoPath {
-			responseBody, err = sjson.SetBytes(responseBody, "id", taskID)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if unifiedVideoPath && strings.HasSuffix(strings.TrimRight(c.Request.URL.Path, "/"), "/content") {
-			if gjson.GetBytes(responseBody, "status").String() != "succeeded" {
-				writeGrokMediaResponse(c, resp, responseBody, s.responseHeaderFilter)
-				return result, nil
-			}
-			videoURL := strings.TrimSpace(gjson.GetBytes(responseBody, "content.video_url").String())
-			if videoURL == "" {
-				writeGrokMediaResponse(c, resp, responseBody, s.responseHeaderFilter)
-				return result, nil
-			}
-			u, parseErr := url.Parse(videoURL)
-			if parseErr != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-				return nil, fmt.Errorf("seedance response is missing a valid video URL")
-			}
-			c.Redirect(http.StatusFound, videoURL)
-			return result, nil
 		}
 	}
 	writeGrokMediaResponse(c, resp, responseBody, s.responseHeaderFilter)

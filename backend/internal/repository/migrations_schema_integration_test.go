@@ -139,12 +139,6 @@ WHERE ns.nspname = 'public'
 	requireColumn(t, tx, "usage_billing_dedup_archive", "request_fingerprint", "character varying", 64, false)
 	requireIndex(t, tx, "usage_billing_dedup_archive", "usage_billing_dedup_archive_pkey")
 
-	// OpenAI-compatible video task migration is discovered by the real runner.
-	requireColumn(t, tx, "compatible_video_tasks", "upstream_id", "text", 0, false)
-	requireColumn(t, tx, "compatible_video_tasks", "payload", "jsonb", 0, false)
-	requireColumn(t, tx, "compatible_video_tasks", "settled", "boolean", 0, false)
-	requireIndex(t, tx, "compatible_video_tasks", "compatible_video_tasks_pending_idx")
-
 	// settings table should exist
 	var settingsRegclass sql.NullString
 	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.settings')").Scan(&settingsRegclass))

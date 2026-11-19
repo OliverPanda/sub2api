@@ -450,56 +450,6 @@ func (s *BalanceNotifyService) sendQuotaAlertEmails(adminEmails []string, accoun
 	s.sendEmails(adminEmails, subject, body, "account", accountName, "dimension", dim.name)
 }
 
-// NotifyUpstreamBalanceLow alerts verified admin recipients after an upstream
-// account is paused because its provider reported insufficient balance.
-func (s *BalanceNotifyService) NotifyUpstreamBalanceLow(account *Account, upstreamMessage string, stoppedUntil time.Time) {
-	if s == nil || account == nil || s.settingRepo == nil || s.notificationEmailService == nil {
-		return
-	}
-	ctx := context.Background()
-	if !s.isAccountQuotaNotifyEnabled(ctx) {
-		return
-	}
-	recipients := s.getAccountQuotaNotifyEmails(ctx)
-	if len(recipients) == 0 {
-		return
-	}
-	accountName := account.Name
-	if strings.TrimSpace(accountName) == "" {
-		accountName = fmt.Sprintf("%s account %d", account.Platform, account.ID)
-	}
-	message := strings.TrimSpace(upstreamMessage)
-	if message == "" {
-		message = "余额不足"
-	}
-	stoppedAt := stoppedUntil.UTC().Format("2006-01-02 15:04:05 UTC")
-	reminderKey := time.Now().UTC().Format("2006-01-02")
-	for _, to := range recipients {
-		go func(recipient string) {
-			sendCtx, cancel := context.WithTimeout(context.Background(), emailSendTimeout)
-			defer cancel()
-			err := s.notificationEmailService.Send(sendCtx, NotificationEmailSendInput{
-				Event:          NotificationEmailEventAccountBalanceLow,
-				RecipientEmail: recipient,
-				RecipientName:  emailRecipientName(recipient),
-				SourceType:     "account_balance_low",
-				SourceID:       strconv.FormatInt(account.ID, 10),
-				ReminderKey:    reminderKey,
-				Variables: map[string]string{
-					"account_id":       strconv.FormatInt(account.ID, 10),
-					"account_name":     accountName,
-					"platform":         account.Platform,
-					"upstream_message": message,
-					"stopped_until":    stoppedAt,
-				},
-			})
-			if err != nil {
-				slog.Error("upstream balance notification failed", "account_id", account.ID, "to", recipient, "error", err)
-			}
-		}(to)
-	}
-}
-
 // sanitizeEmailHeader removes CR/LF characters to prevent SMTP header injection.
 func sanitizeEmailHeader(s string) string {
 	return strings.NewReplacer("\r", "", "\n", "").Replace(s)

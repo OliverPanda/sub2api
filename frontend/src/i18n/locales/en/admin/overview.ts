@@ -1113,15 +1113,13 @@ export default {
       videoPricing: {
         title: 'Video Generation Pricing',
         description:
-          'Configure video prices in USD per second. LiteLLM/OpenAI videos require an explicit model or resolution price. Grok keeps its built-in defaults.',
+          'Configure Grok video generation prices in USD per second of output video. Leave empty to use the default per-second rates (grok-imagine-video: $0.05/s 480p, $0.07/s 720p; video-1.5: $0.08/s 480p, $0.14/s 720p, $0.25/s 1080p).',
         modelOverridesTitle: 'Per-model video price overrides',
-        addModel: 'Add model',
-        modelNamePlaceholder: 'Model alias, e.g. video-veo',
-        modelOverridesDescription: 'Each populated cell overrides the flat resolution price for that model family. Preview and legacy aliases for video-1.5 use the same family; empty 480p/720p/1080p cells fall back to the group price. 768P/2K require an explicit model price.',
+        modelOverridesDescription: 'Each populated cell overrides the flat resolution price for that model family. Preview and legacy aliases for video-1.5 use the same family; empty cells fall back to the flat resolution price.',
         independentMultiplier: 'Use independent video multiplier',
         videoMultiplier: 'Video multiplier',
         modeHint:
-          'Cost = price per second × requested seconds × effective video multiplier. LiteLLM requires explicit seconds and size; Grok keeps its native duration defaults.',
+          'Videos are billed per second: per-second price × duration (1-15s, default 8s). By default the current effective group multiplier applies; independent mode uses the video multiplier instead.',
         finalPricePreview: 'Final per-second price preview',
         notConfigured: 'Not configured'
       },

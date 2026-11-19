@@ -71,24 +71,6 @@ func TestSeedanceStatusAndDelete(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
-func TestSeedanceUnifiedVideoStatusAndContent(t *testing.T) {
-	upstream := &grokMediaContentUpstreamStub{response: grokMediaContentStatusResponse(`{"id":"task-1","status":"succeeded","content":{"video_url":"https://cdn.example/video.mp4"},"usage":{"completion_tokens":10}}`)}
-	svc := &OpenAIGatewayService{httpUpstream: upstream}
-	c, w := grokMediaContentTestContext(http.MethodGet, "/v1/videos/seedance:task-1", nil)
-	result, err := svc.ForwardSeedance(context.Background(), c, seedanceTestAccount(), SeedanceEndpointStatus, "seedance:task-1", nil)
-	require.NoError(t, err)
-	require.Equal(t, "seedance:task-1", gjson.Get(w.Body.String(), "id").String())
-	require.Equal(t, "seedance:task-1", result.ResponseID)
-
-	upstream = &grokMediaContentUpstreamStub{response: grokMediaContentStatusResponse(`{"id":"task-1","status":"succeeded","content":{"video_url":"https://cdn.example/video.mp4"},"usage":{"completion_tokens":10}}`)}
-	svc.httpUpstream = upstream
-	c, w = grokMediaContentTestContext(http.MethodGet, "/v1/videos/seedance:task-1/content", nil)
-	_, err = svc.ForwardSeedance(context.Background(), c, seedanceTestAccount(), SeedanceEndpointStatus, "seedance:task-1", nil)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusFound, w.Code)
-	require.Equal(t, "https://cdn.example/video.mp4", w.Header().Get("Location"))
-}
-
 func TestSeedanceValidationAndCapability(t *testing.T) {
 	for _, body := range []string{`{`, `[]`, `{}`, `{"model":12,"content":[{}]}`, `{"model":"x","content":[]}`} {
 		_, err := ParseSeedanceRequest([]byte(body))

@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createVideoModelPricesForm,
-  addVideoModelPrice,
   serializeVideoModelPrices,
-  videoModelPriceFamilyRows,
-  videoPriceResolutions
+  videoModelPriceFamilyRows
 } from '../groupsVideoModelPricing'
 
 describe('Grok video model pricing form', () => {
@@ -46,28 +44,4 @@ describe('Grok video model pricing form', () => {
       'grok-imagine-video-2': { '480p': 0.2 }
     })
   })
-})
-
-describe('compatible video aliases', () => {
-  it('adds arbitrary aliases without replacing existing prices', () => {
-    const form = createVideoModelPricesForm()
-    expect(addVideoModelPrice(form, ' Video-Veo ')).toBe(true)
-    form['video-veo']['720p'] = 0.25
-    expect(addVideoModelPrice(form, 'video-veo')).toBe(false)
-    expect(addVideoModelPrice(form, '  ')).toBe(false)
-    expect(serializeVideoModelPrices(form)).toEqual({ 'video-veo': { '720p': 0.25 } })
-    expect(videoModelPriceFamilyRows(form).map(({ key }) => key)).toContain('video-veo')
-  })
-})
-
-it('keeps MiniMax quality tiers separate from flat low-resolution prices', () => {
-  const form = createVideoModelPricesForm({ 'video-minimax-h3': { '768p': 0.2, '2k': 0.4 } })
-  expect(serializeVideoModelPrices(form)).toEqual({ 'video-minimax-h3': { '768p': 0.2, '2k': 0.4 } })
-  expect(form['video-minimax-h3']['480p']).toBeNull()
-})
-
-it('shows only model-supported quality tiers for known video families', () => {
-  expect(videoPriceResolutions('openai', 'video-minimax-h3').map(({ key }) => key)).toEqual(['768p', '2k'])
-  expect(videoPriceResolutions('openai', 'video-minimax-h3-max').map(({ key }) => key)).toEqual(['480p', '768p'])
-  expect(videoPriceResolutions('openai', 'video-seedance').map(({ key }) => key)).toEqual(['480p', '720p', '1080p'])
 })

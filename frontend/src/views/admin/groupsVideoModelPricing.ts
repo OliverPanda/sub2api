@@ -4,39 +4,6 @@ export const grokVideoPriceResolutions = [
   { key: '1080p', label: '1080p' }
 ] as const
 
-export const compatibleVideoPriceResolutions = [
-  { key: '480p', label: '480p' },
-  { key: '720p', label: '720p' },
-  { key: '768p', label: '768P' },
-  { key: '1080p', label: '1080p' },
-  { key: '2k', label: '2K' }
-] as const
-
-export function videoPriceResolutions(platform: string, model = '') {
-  if (platform === 'grok') return grokVideoPriceResolutions
-  const normalized = model.trim().toLowerCase()
-  if (normalized.includes('minimax-h3-max')) {
-    return [
-      { key: '480p', label: '480p' },
-      { key: '768p', label: '768P' }
-    ] as const
-  }
-  if (normalized.includes('minimax-h3')) {
-    return [
-      { key: '768p', label: '768P' },
-      { key: '2k', label: '2K' }
-    ] as const
-  }
-  if (normalized.includes('seedance')) {
-    return [
-      { key: '480p', label: '480p' },
-      { key: '720p', label: '720p' },
-      { key: '1080p', label: '1080p' }
-    ] as const
-  }
-  return compatibleVideoPriceResolutions
-}
-
 export const grokVideoPriceFamilies = [
   { key: 'grok-imagine-video', label: 'grok-imagine-video' },
   { key: 'grok-imagine-video-1.5', label: 'grok-imagine-video-1.5' }
@@ -56,7 +23,7 @@ function normalizePrice(value: unknown): number | null {
 }
 
 function emptyTiers(): Record<string, number | string | null> {
-  return Object.fromEntries(compatibleVideoPriceResolutions.map(({ key }) => [key, null]))
+  return Object.fromEntries(grokVideoPriceResolutions.map(({ key }) => [key, null]))
 }
 
 // Keep unknown families from an existing group so a future backend catalog is
@@ -107,11 +74,4 @@ export function videoModelPriceFamilyRows(form: VideoModelPricesForm) {
     .sort()
     .map((key) => ({ key, label: key }))
   return [...grokVideoPriceFamilies, ...extra]
-}
-
-export function addVideoModelPrice(form: VideoModelPricesForm, model: string): boolean {
-  const key = normalizeFamily(model)
-  if (!key || key === '__proto__' || Object.prototype.hasOwnProperty.call(form, key)) return false
-  form[key] = emptyTiers()
-  return true
 }

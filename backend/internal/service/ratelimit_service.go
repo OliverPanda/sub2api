@@ -29,7 +29,6 @@ type RateLimitService struct {
 	timeoutCounterCache   TimeoutCounterCache
 	openAI403CounterCache OpenAI403CounterCache
 	settingService        *SettingService
-	balanceNotifyService  *BalanceNotifyService
 	tokenCacheInvalidator TokenCacheInvalidator
 	runtimeBlocker        AccountRuntimeBlocker
 	// ollamaCloudUsageProbe is the optional Ollama Cloud usage probe scheduler
@@ -126,10 +125,6 @@ func (s *RateLimitService) SetOpenAI403CounterCache(cache OpenAI403CounterCache)
 // SetSettingService 设置系统设置服务（可选依赖）
 func (s *RateLimitService) SetSettingService(settingService *SettingService) {
 	s.settingService = settingService
-}
-
-func (s *RateLimitService) SetBalanceNotifyService(balanceNotifyService *BalanceNotifyService) {
-	s.balanceNotifyService = balanceNotifyService
 }
 
 // SetTokenCacheInvalidator 设置 token 缓存清理器（可选依赖）

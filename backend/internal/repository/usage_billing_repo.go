@@ -50,16 +50,6 @@ func (r *usageBillingRepository) Apply(ctx context.Context, cmd *service.UsageBi
 		return &service.UsageBillingApplyResult{Applied: false}, nil
 	}
 
-	if cmd.CompatibleVideoTaskID != "" {
-		if err := captureCompatibleVideoTask(ctx, tx, cmd); err != nil {
-			return nil, err
-		}
-	}
-	if cmd.ReplicateMusicTaskID != "" {
-		if err := captureReplicateMusicTask(ctx, tx, cmd); err != nil {
-			return nil, err
-		}
-	}
 	result := &service.UsageBillingApplyResult{Applied: true}
 	if err := r.applyUsageBillingEffects(ctx, tx, cmd, result); err != nil {
 		return nil, err
@@ -189,7 +179,7 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	if cmd.BalanceCost > 0 {
-		newBalance, sufficient, err := deductUsageBillingBalanceForVideo(ctx, tx, cmd.UserID, cmd.BalanceCost, cmd.CompatibleVideoTaskID != "")
+		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
 		if err != nil {
 			return err
 		}
@@ -253,22 +243,12 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 }
 
 func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {
-	return deductUsageBillingBalanceForVideo(ctx, tx, userID, amount, false)
-}
-
-// Video tasks retain a durable user snapshot and may finish after the user is
-// soft-deleted. Their already-reserved balance must still be capturable.
-func deductUsageBillingBalanceForVideo(ctx context.Context, tx *sql.Tx, userID int64, amount float64, allowDeleted bool) (float64, bool, error) {
 	var newBalance float64
-	deletedClause := " AND deleted_at IS NULL"
-	if allowDeleted {
-		deletedClause = ""
-	}
 	err := tx.QueryRowContext(ctx, `
 		UPDATE users
 		SET balance = balance - $1,
 			updated_at = NOW()
-		WHERE id = $2`+deletedClause+` AND balance >= $1
+		WHERE id = $2 AND deleted_at IS NULL AND balance >= $1
 		RETURNING balance
 	`, amount, userID).Scan(&newBalance)
 	if err == nil {
@@ -282,7 +262,7 @@ func deductUsageBillingBalanceForVideo(ctx context.Context, tx *sql.Tx, userID i
 		UPDATE users
 		SET balance = balance - $1,
 			updated_at = NOW()
-		WHERE id = $2`+deletedClause+`
+		WHERE id = $2 AND deleted_at IS NULL
 		RETURNING balance
 	`, amount, userID).Scan(&newBalance)
 	if errors.Is(err, sql.ErrNoRows) {

@@ -23,6 +23,7 @@ func newGatewayRoutesTestRouter(platform ...string) *gin.Engine {
 		},
 	}, platform...)
 }
+
 func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -74,6 +75,7 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 		require.NotEqual(t, http.StatusNotFound, w.Code, "path=%s should hit OpenAI responses handler", path)
 	}
 }
+
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
 	router := newGatewayRoutesTestRouter()
 	registered := make(map[string]bool)
@@ -300,8 +302,8 @@ func TestGatewayRoutesCompositeChatCompletionsWithGrokModelUsesOpenAIGateway(t *
 	}
 }
 
-func TestGatewayRoutesUnsupportedVideosAreRejectedAtPlatformGate(t *testing.T) {
-	router := newGatewayRoutesTestRouter(service.PlatformAnthropic)
+func TestGatewayRoutesNonGrokVideosAreRejectedAtPlatformGate(t *testing.T) {
+	router := newGatewayRoutesTestRouter(service.PlatformOpenAI)
 
 	for _, tc := range []struct {
 		method string
@@ -463,25 +465,4 @@ func TestGatewayRoutesOpenAICountTokensPathIsRegistered(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	require.NotEqual(t, http.StatusNotFound, w.Code)
-}
-
-func TestGatewayRoutesOpenAICompatibleVideosAreRegistered(t *testing.T) {
-	router := newGatewayRoutesTestRouter(service.PlatformOpenAI)
-	for _, tc := range []struct{ method, path string }{
-		{http.MethodPost, "/v1/videos"}, {http.MethodPost, "/videos"},
-		{http.MethodPost, "/v1/videos/generations"},
-		{http.MethodGet, "/v1/videos/mvid_123"}, {http.MethodGet, "/videos/mvid_123"},
-		{http.MethodGet, "/v1/videos/mvid_123/content"}, {http.MethodGet, "/videos/mvid_123/content"},
-		{http.MethodPost, "/v1/music"}, {http.MethodPost, "/music"},
-		{http.MethodGet, "/v1/music/rmus_123"}, {http.MethodGet, "/music/rmus_123"},
-		{http.MethodGet, "/v1/music/rmus_123/content"}, {http.MethodGet, "/music/rmus_123/content"},
-		{http.MethodDelete, "/v1/music/rmus_123"}, {http.MethodDelete, "/music/rmus_123"},
-	} {
-		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(`{"model":"video-veo","prompt":"waves","seconds":"8","size":"1280x720"}`))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-		require.NotEqual(t, http.StatusNotFound, w.Code, tc.path)
-		require.NotContains(t, w.Body.String(), "not supported for this platform")
-	}
 }

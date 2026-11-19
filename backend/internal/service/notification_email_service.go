@@ -28,7 +28,6 @@ const (
 	NotificationEmailEventBalanceLow                  = "balance.low"
 	NotificationEmailEventBalanceRechargeSuccess      = "balance.recharge_success"
 	NotificationEmailEventAccountQuotaAlert           = "account.quota_alert"
-	NotificationEmailEventAccountBalanceLow           = "account.balance_low"
 	NotificationEmailEventContentModerationViolation  = "content_moderation.violation_notice"
 	NotificationEmailEventContentModerationDisabled   = "content_moderation.account_disabled"
 	NotificationEmailEventCyberPolicyNotice           = "content_moderation.cyber_policy_notice"
@@ -923,8 +922,6 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"quota_limit":         "100.00",
 			"quota_remaining":     "20.00",
 			"quota_threshold":     "20%",
-			"upstream_message":    "Insufficient balance",
-			"stopped_until":       "2026-05-20 12:10:00",
 			"triggered_at":        "2026-05-20 12:00:00",
 			"group_name":          "默认分组",
 			"moderation_category": "violence",
@@ -973,8 +970,6 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"quota_limit":         "100.00",
 		"quota_remaining":     "20.00",
 		"quota_threshold":     "20%",
-		"upstream_message":    "余额不足，请充值后重试",
-		"stopped_until":       "2026-05-20 12:10:00",
 		"triggered_at":        "2026-05-20 12:00:00",
 		"group_name":          "Default group",
 		"moderation_category": "violence",
@@ -1034,7 +1029,6 @@ var notificationEmailEventOrder = []string{
 	NotificationEmailEventBalanceLow,
 	NotificationEmailEventBalanceRechargeSuccess,
 	NotificationEmailEventAccountQuotaAlert,
-	NotificationEmailEventAccountBalanceLow,
 	NotificationEmailEventContentModerationViolation,
 	NotificationEmailEventContentModerationDisabled,
 	NotificationEmailEventCyberPolicyNotice,
@@ -1107,15 +1101,6 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
 			"account_id", "account_name", "platform", "quota_dimension", "quota_used", "quota_limit", "quota_remaining", "quota_threshold"),
-	},
-	NotificationEmailEventAccountBalanceLow: {
-		Event:       NotificationEmailEventAccountBalanceLow,
-		Label:       "Upstream account balance exhausted",
-		Description: "Sent to configured admin notification emails when an upstream account reports insufficient balance and is paused from scheduling.",
-		Category:    "admin",
-		Optional:    false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
-			"account_id", "account_name", "platform", "upstream_message", "stopped_until"),
 	},
 	NotificationEmailEventContentModerationViolation: {
 		Event:       NotificationEmailEventContentModerationViolation,
@@ -1333,32 +1318,6 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
   <tr><td>剩余额度</td><td>{{quota_remaining}}</td></tr>
   <tr><td>告警阈值</td><td>{{quota_threshold}}</td></tr>
 </table>`),
-		},
-	},
-	NotificationEmailEventAccountBalanceLow: {
-		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Upstream balance exhausted - {{account_name}}",
-			HTML: notificationEmailCard("#dc2626", "Upstream balance exhausted", `
-<p>The upstream account <strong>{{account_name}}</strong> reported insufficient balance and has been paused from new requests.</p>
-<table style="width:100%;border-collapse:collapse;">
-  <tr><td>Account ID</td><td>{{account_id}}</td></tr>
-  <tr><td>Platform</td><td>{{platform}}</td></tr>
-  <tr><td>Upstream error</td><td>{{upstream_message}}</td></tr>
-  <tr><td>Next balance check</td><td>{{stopped_until}}</td></tr>
-</table>
-<p>Recharge the upstream account. Scheduling will resume automatically after a balance check confirms recovery.</p>`),
-		},
-		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 上游余额不足 - {{account_name}}",
-			HTML: notificationEmailCard("#dc2626", "上游余额不足，调用已暂停", `
-<p>上游账号 <strong>{{account_name}}</strong> 返回余额不足，系统已暂停向该账号发送新请求。</p>
-<table style="width:100%;border-collapse:collapse;">
-  <tr><td>账号 ID</td><td>{{account_id}}</td></tr>
-  <tr><td>平台</td><td>{{platform}}</td></tr>
-  <tr><td>上游错误</td><td>{{upstream_message}}</td></tr>
-  <tr><td>下次余额检查时间</td><td>{{stopped_until}}</td></tr>
-</table>
-<p>请为该上游账号充值。系统确认余额恢复后会自动重新启用调度。</p>`),
 		},
 	},
 	NotificationEmailEventContentModerationViolation: {

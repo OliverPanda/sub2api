@@ -783,10 +783,6 @@ Long-running OpenAI/Grok image generation and editing can be submitted through `
 
 ---
 
-## LiteLLM Image and Video Gateway
-
-OpenAI API-key accounts can explicitly enable `video_generation` and relay unified video requests through an internal LiteLLM service. Sub2API retains authentication, task ownership, balance holds and billing. See [setup and API examples](docs/LITELLM_MEDIA_GATEWAY.md), plus the [video and music API and upstream setup guide](docs/VIDEO_MUSIC_API.md).
-
 ## Grok / xAI Support
 
 Sub2API supports both Grok subscription accounts through xAI OAuth and standard xAI API-key accounts. Both account types forward OpenAI-compatible Responses traffic to xAI.
