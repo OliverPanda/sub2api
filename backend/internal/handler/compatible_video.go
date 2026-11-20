@@ -70,7 +70,7 @@ func (h *OpenAIGatewayHandler) CompatibleVideo(c *gin.Context) {
 			h.errorResponse(c, 502, "api_error", "Failed to download video")
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		for _, name := range []string{"Content-Type", "Content-Length", "Content-Disposition"} {
 			if v := resp.Header.Get(name); v != "" {
 				c.Header(name, v)

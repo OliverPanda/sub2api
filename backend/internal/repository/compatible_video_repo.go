@@ -21,7 +21,7 @@ func (r *usageBillingRepository) CreateCompatibleVideo(ctx context.Context, task
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err = lockAccountForMediaTask(ctx, tx, task.AccountID); err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (r *usageBillingRepository) ReleaseCompatibleVideo(ctx context.Context, id,
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var userID int64
 	var hold float64
 	err = tx.QueryRowContext(ctx, `UPDATE compatible_video_tasks SET status=$2,settled=true,updated_at=now() WHERE id=$1 AND NOT settled RETURNING user_id,hold_amount`, id, status).Scan(&userID, &hold)
@@ -155,7 +155,7 @@ func (r *usageBillingRepository) ListPendingCompatibleVideos(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var tasks []*service.CompatibleVideoTask
 	for rows.Next() {
 		t, err := scanCompatibleVideo(rows)

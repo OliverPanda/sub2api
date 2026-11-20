@@ -247,10 +247,6 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 	return service.ErrSubscriptionNotFound
 }
 
-func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {
-	return deductUsageBillingBalanceForVideo(ctx, tx, userID, amount, false)
-}
-
 // Video tasks retain a durable user snapshot and may finish after the user is
 // soft-deleted. Their already-reserved balance must still be capturable.
 func deductUsageBillingBalanceForVideo(ctx context.Context, tx *sql.Tx, userID int64, amount float64, allowDeleted bool) (float64, bool, error) {
@@ -287,6 +283,11 @@ func deductUsageBillingBalanceForVideo(ctx context.Context, tx *sql.Tx, userID i
 		return 0, false, err
 	}
 	return newBalance, false, nil
+}
+
+//nolint:unused // exercised by repository unit tests for the legacy billing path.
+func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {
+	return deductUsageBillingBalanceForVideo(ctx, tx, userID, amount, false)
 }
 
 func reserveUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {

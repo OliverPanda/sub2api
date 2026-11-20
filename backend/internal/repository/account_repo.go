@@ -1055,7 +1055,7 @@ func hasPendingMediaTasks(ctx context.Context, exec sqlExecutor, accountID int64
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var tables []string
 	for rows.Next() {
 		var tableName string

@@ -526,7 +526,7 @@ func (s *OpenAIGatewayService) SubmitCompatibleVideo(ctx context.Context, accoun
 		markCompatibleVideoSubmissionUnknown(ctx, repo, task.ID)
 		return CompatibleVideoErrorBody(task.ID), http.StatusBadGateway, fmt.Errorf("video submission outcome unknown; task %s requires reconciliation: %w", task.ID, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	responseBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, nil, openAITooLargeError)
 	if err != nil {
 		markCompatibleVideoSubmissionUnknown(ctx, repo, task.ID)
@@ -597,7 +597,7 @@ func (s *OpenAIGatewayService) PollCompatibleVideo(ctx context.Context, task *Co
 	if err != nil {
 		return nil, 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, nil, openAITooLargeError)
 	if err != nil {
 		return nil, 0, err
@@ -765,7 +765,8 @@ func validateCompatibleVideoUpstreamID(id string) error {
 		return errors.New("invalid video ID")
 	}
 	for _, c := range []byte(id) {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("_-.+/=", rune(c))) {
+		allowed := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("_-.+/=", rune(c))
+		if !allowed {
 			return errors.New("invalid video ID")
 		}
 	}
@@ -844,7 +845,11 @@ func compatibleVideoResponse(body []byte, task *CompatibleVideoTask, status stri
 		}
 	}
 	if status == "completed" && !rewroteURL {
-		body, err = sjson.SetBytes(body, "video_url", "/v1/videos/"+task.ID+"/content")
+		updated, setErr := sjson.SetBytes(body, "video_url", "/v1/videos/"+task.ID+"/content")
+		if setErr != nil {
+			return nil, setErr
+		}
+		body = updated
 	}
 	return body, nil
 }
