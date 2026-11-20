@@ -36,6 +36,26 @@ func GroupAllowsImageGeneration(group *Group) bool {
 	return group == nil || group.AllowImageGeneration
 }
 
+// GroupAllowsVideoGeneration keeps video admission separate from image access.
+func GroupAllowsVideoGeneration(group *Group) bool {
+	if group == nil {
+		return true
+	}
+	if group.VideoPrice480P != nil || group.VideoPrice720P != nil || group.VideoPrice1080P != nil {
+		return true
+	}
+	for _, tiers := range group.VideoModelPrices {
+		if len(tiers) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func VideoGenerationPermissionMessage() string {
+	return "Video generation is not enabled for this group"
+}
+
 // IsImageGenerationIntent classifies requests that can produce generated images.
 func IsImageGenerationIntent(endpoint string, requestedModel string, body []byte) bool {
 	if IsImageGenerationEndpoint(endpoint) {

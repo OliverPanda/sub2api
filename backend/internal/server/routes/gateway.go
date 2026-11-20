@@ -18,6 +18,16 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+func setVideoRouteParam(c *gin.Context, key, value string) {
+	for i := range c.Params {
+		if c.Params[i].Key == key {
+			c.Params[i].Value = value
+			return
+		}
+	}
+	c.Params = append(c.Params, gin.Param{Key: key, Value: value})
+}
+
 // RegisterGatewayRoutes 注册 API 网关路由（Claude/OpenAI/Gemini 兼容）
 func RegisterGatewayRoutes(
 	r *gin.Engine,
@@ -90,6 +100,10 @@ func RegisterGatewayRoutes(
 		}
 	}
 	videoGenerationHandler := func(c *gin.Context) {
+		if getGroupPlatform(c) == service.PlatformOpenAI {
+			h.OpenAIGateway.CompatibleVideo(c)
+			return
+		}
 		// Video status/content lookups below already allow Composite groups; keep
 		// task creation aligned so composite keys that route to Grok accounts can
 		// submit video generation jobs.
@@ -106,6 +120,15 @@ func RegisterGatewayRoutes(
 		})
 	}
 	videoStatusHandler := func(c *gin.Context) {
+		if strings.HasPrefix(c.Param("request_id"), "seedance:") {
+			setVideoRouteParam(c, "task_id", strings.TrimPrefix(c.Param("request_id"), "seedance:"))
+			h.OpenAIGateway.SeedanceTasks(c)
+			return
+		}
+		if getGroupPlatform(c) == service.PlatformOpenAI || strings.HasPrefix(c.Param("request_id"), service.CompatibleVideoIDPrefix) {
+			h.OpenAIGateway.CompatibleVideo(c)
+			return
+		}
 		// Video status requests do not carry a model, so composite groups cannot
 		// be resolved by compositeTargetPlatformMiddleware. Route them through
 		// the Grok handler and let scheduler/account selection enforce capacity.
@@ -122,6 +145,15 @@ func RegisterGatewayRoutes(
 		})
 	}
 	videoContentHandler := func(c *gin.Context) {
+		if strings.HasPrefix(c.Param("request_id"), "seedance:") {
+			setVideoRouteParam(c, "task_id", strings.TrimPrefix(c.Param("request_id"), "seedance:"))
+			h.OpenAIGateway.SeedanceTasks(c)
+			return
+		}
+		if getGroupPlatform(c) == service.PlatformOpenAI || strings.HasPrefix(c.Param("request_id"), service.CompatibleVideoIDPrefix) {
+			h.OpenAIGateway.CompatibleVideo(c)
+			return
+		}
 		// Video content requests do not carry a model, so composite groups cannot
 		// be resolved by compositeTargetPlatformMiddleware. Route them through
 		// the Grok handler just like video status lookups.

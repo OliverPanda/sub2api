@@ -208,6 +208,9 @@ func (g *Group) GetVideoPriceForModel(model, resolution string) *float64 {
 	if price := LookupVideoModelPrice(g.VideoModelPrices, model, resolution); price != nil {
 		return price
 	}
+	if tier, ok := LookupCompatibleVideoBillingResolution(resolution); ok && (tier == "768p" || tier == "2k") {
+		return nil // These tiers require an explicit model price; never borrow 480p.
+	}
 	return g.GetVideoPrice(resolution)
 }
 

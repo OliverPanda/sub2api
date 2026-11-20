@@ -843,6 +843,7 @@ export default {
         capabilityChatCompletions: 'Chat Completions',
         capabilityChatCompletionsAuto: 'Chat Completions（自动探测）',
         capabilityEmbeddings: 'Embeddings',
+        capabilityVideoGeneration: '视频生成',
         responsesStatusAutoSupported: '自动探测：Responses',
         responsesStatusAutoUnsupported: '自动探测：Chat Completions',
         responsesStatusAutoUnknown: '自动探测：未探测',

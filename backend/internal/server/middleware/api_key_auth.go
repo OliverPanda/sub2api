@@ -169,7 +169,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path) || isCompatibleVideoRead(c.Request.Method, c.Request.URL.Path)
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -446,4 +446,22 @@ func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool)
 		return "GROUP_DISABLED", "API Key 所属分组已停用", false
 	}
 	return "", "", true
+}
+
+// Task lookup still authenticates owner, key, IP and group; a fully reserved
+// balance must not prevent a client from retrieving its own video.
+func isCompatibleVideoRead(method, path string) bool {
+	if method != http.MethodGet {
+		return false
+	}
+	for _, prefix := range []string{"/v1/videos/", "/videos/"} {
+		if strings.HasPrefix(path, prefix) {
+			rest := strings.TrimPrefix(path, prefix)
+			for _, alias := range []string{"generations/", "edits/", "extensions/"} {
+				rest = strings.TrimPrefix(rest, alias)
+			}
+			return strings.HasPrefix(rest, service.CompatibleVideoIDPrefix)
+		}
+	}
+	return false
 }

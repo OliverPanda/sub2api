@@ -1110,13 +1110,15 @@ export default {
       videoPricing: {
         title: '视频生成计费',
         description:
-          '配置 Grok 视频生成的每秒单价（USD/秒），留空则使用默认每秒价（grok-imagine-video：480p $0.05/s、720p $0.07/s；video-1.5：480p $0.08/s、720p $0.14/s、1080p $0.25/s）',
+          '配置视频每秒单价（USD/秒）。LiteLLM/OpenAI 视频必须配置模型或分辨率价格；Grok 沿用内置默认价。',
         modelOverridesTitle: '按模型覆盖视频价格',
-        modelOverridesDescription: '已填写的单元格会覆盖该模型族的平面分辨率价格。video-1.5 的 preview 与 legacy 别名共用同一模型族；留空则回退到平面分辨率价格。',
+        addModel: '添加模型',
+        modelNamePlaceholder: '模型别名，例如 video-veo',
+        modelOverridesDescription: '已填写的单元格会覆盖该模型族的平面分辨率价格。video-1.5 的 preview 与 legacy 别名共用同一模型族；480p/720p/1080p 留空回退到分组默认价，768P/2K 必须按模型单独定价。',
         independentMultiplier: '视频倍率独立',
         videoMultiplier: '视频独立倍率',
         modeHint:
-          '视频按秒计费：费用 = 每秒价格 × 时长（1-15 秒，未指定默认 8 秒）。默认叠加当前分组有效倍率；开启独立倍率后改用视频独立倍率。',
+          '费用 = 每秒单价 × 请求时长 × 视频有效倍率。LiteLLM 必须显式提交 seconds 与 size；Grok 沿用原生时长默认值。',
         finalPricePreview: '最终每秒价格预览',
         notConfigured: '未配置'
       },

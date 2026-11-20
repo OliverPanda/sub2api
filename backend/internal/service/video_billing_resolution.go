@@ -5,7 +5,10 @@ import "strings"
 const (
 	VideoBillingResolution480P  = "480p"
 	VideoBillingResolution720P  = "720p"
+	VideoBillingResolution768P  = "768p"
 	VideoBillingResolution1080P = "1080p"
+	VideoBillingResolution2K    = "2k"
+	VideoBillingResolution4K    = "4k"
 )
 
 // xAI 视频生成按秒计费，duration 请求参数允许 1-15 秒；未指定时上游默认生成 8 秒。
@@ -54,4 +57,22 @@ func NormalizeVideoBillingResolutionOrDefault(resolution string) string {
 		return normalized
 	}
 	return VideoBillingResolution480P
+}
+
+// Compatible adapters expose additional quality tiers. Keep xAI's legacy
+// fallback behavior separate so unknown native tiers do not change semantics.
+func LookupCompatibleVideoBillingResolution(resolution string) (string, bool) {
+	if tier, ok := LookupVideoBillingResolution(resolution); ok {
+		return tier, true
+	}
+	switch strings.ToLower(strings.TrimSpace(resolution)) {
+	case "768", "768p":
+		return VideoBillingResolution768P, true
+	case "1440", "1440p", "2k", "2560x1440":
+		return VideoBillingResolution2K, true
+	case "4k", "2160p", "3840x2160":
+		return VideoBillingResolution4K, true
+	default:
+		return "", false
+	}
 }
