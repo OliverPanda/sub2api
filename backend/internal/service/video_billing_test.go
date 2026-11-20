@@ -50,17 +50,16 @@ func TestNormalizeAndLookupVideoModelPrices(t *testing.T) {
 
 func TestNormalizeVideoModelPricesDropsUnknownResolutions(t *testing.T) {
 	t.Parallel()
-	// "4k" and "1080i" are not billable tiers. Collapsing them into 480p would
-	// charge a 480p request at the operator's high-resolution price.
+	// Unknown tiers must not collapse into 480p and inherit its price.
 	norm := NormalizeVideoModelPrices(map[string]map[string]float64{
 		"grok-imagine-video": {"480p": 0.05, "4k": 0.50, "1080i": 0.30},
 	})
 	require.NotNil(t, norm)
-	require.Equal(t, map[string]float64{VideoBillingResolution480P: 0.05}, norm[VideoPriceFamilyGrokImagineVideo])
+	require.Equal(t, map[string]float64{VideoBillingResolution480P: 0.05, VideoBillingResolution4K: 0.50}, norm[VideoPriceFamilyGrokImagineVideo])
 
 	// A model whose tiers are all unrecognized contributes no family at all.
 	require.Nil(t, NormalizeVideoModelPrices(map[string]map[string]float64{
-		"grok-imagine-video": {"4k": 0.50},
+		"grok-imagine-video": {"1080i": 0.50},
 	}))
 }
 
