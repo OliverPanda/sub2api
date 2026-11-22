@@ -209,7 +209,7 @@ jobs:
           set -e
           printf '%s\n' "$deploy_output"
           if (( deploy_status != 0 )); then
-            summary=$(printf '%s' "$deploy_output" | tr '\n' ' ' | cut -c1-900)
+            summary=$(printf '%s' "$deploy_output" | tr '\n' ' ' | cut -c1-4000)
             echo "::error title=Production deploy failed::${summary}"
             exit "$deploy_status"
           fi

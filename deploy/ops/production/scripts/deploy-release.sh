@@ -240,7 +240,7 @@ verify_image() {
   log INFO "Pulling ${component} image ${image}"
   local attempt
   for attempt in 1 2 3; do
-    if docker pull "$image"; then
+    if docker pull -q "$image"; then
       break
     fi
     if [[ "$attempt" == 3 ]]; then
