@@ -34,6 +34,13 @@
 	# Bridge/Dujiao routes are intentionally not proxied anymore.
 	redir /shop /payment 308
 	redir /shop/* /payment 308
+	redir /playground /playground/ 308
+
+	handle_path /playground/* {
+		reverse_proxy playground:8081 {
+			import proxy_headers
+		}
+	}
 
 	# Keep this ahead of the catch-all handle. A bare respond directive is
 	# sorted after handle by Caddy and would never see these requests.

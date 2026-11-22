@@ -1,0 +1,9 @@
+{
+  "name": "sub2api-playground-sidecar",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "check": "node --check server.mjs"
+  }
+}

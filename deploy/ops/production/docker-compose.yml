@@ -87,6 +87,31 @@ services:
     stop_grace_period: 45s
     logging: *default-logging
 
+  playground:
+    image: ${PLAYGROUND_IMAGE:-ghcr.io/oliverpanda/sub2api-playground:not-deployed}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: "8081"
+      SUB2API_UPSTREAM: "http://sub2api:8080"
+      PLAYGROUND_API_BASE_URL: "https://${PUBLIC_DOMAIN:-api.xddapi.org.uk}/v1"
+    expose:
+      - "8081"
+    depends_on:
+      sub2api:
+        condition: service_healthy
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 10s
+    logging: *default-logging
+
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped

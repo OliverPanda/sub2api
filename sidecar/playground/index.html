@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>模型快速测试 | XDDAPI</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f7fb; color: #18212f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top right, #e1f1ff, transparent 36rem), #f5f7fb; }
+    main { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 52px 0 72px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 44px); letter-spacing: -.02em; }
+    p { color: #617084; line-height: 1.6; margin: 0; }
+    .brand { color: #2176d2; font-weight: 700; text-decoration: none; white-space: nowrap; }
+    .panel { background: #fff; border: 1px solid #dce4ee; border-radius: 12px; box-shadow: 0 16px 44px rgba(41, 65, 96, .08); padding: 24px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    label { display: grid; gap: 7px; color: #40516a; font-size: 13px; font-weight: 650; }
+    input, textarea, select { width: 100%; border: 1px solid #cbd6e4; border-radius: 8px; padding: 11px 12px; background: #fff; color: #18212f; font: inherit; }
+    textarea { min-height: 150px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { outline: 3px solid rgba(33, 118, 210, .16); border-color: #2176d2; }
+    .field { margin-bottom: 18px; }
+    .mode { display: inline-flex; border: 1px solid #cbd6e4; border-radius: 8px; padding: 3px; background: #f7f9fc; margin-bottom: 20px; }
+    .mode button { border: 0; border-radius: 6px; padding: 9px 16px; background: transparent; color: #617084; cursor: pointer; font: inherit; }
+    .mode button.active { background: #2176d2; color: #fff; }
+    .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .primary { border: 0; border-radius: 8px; padding: 12px 18px; background: #2176d2; color: #fff; cursor: pointer; font: inherit; font-weight: 700; }
+    .primary:disabled { opacity: .55; cursor: wait; }
+    .status { min-height: 24px; color: #617084; font-size: 14px; }
+    .error { color: #b42318; }
+    .result { margin-top: 22px; border-top: 1px solid #e5ebf2; padding-top: 20px; }
+    .result img, .result video { display: block; max-width: 100%; max-height: 520px; margin: 14px auto 0; border-radius: 8px; background: #eef2f7; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #111827; color: #d8e4f2; border-radius: 8px; padding: 14px; overflow: auto; font-size: 12px; }
+    .note { margin-top: 14px; font-size: 12px; color: #7a8798; }
+    @media (max-width: 640px) { main { width: min(100% - 20px, 920px); padding-top: 28px; } header { flex-direction: column; } .row { grid-template-columns: 1fr; } .panel { padding: 17px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>模型快速测试</h1><p>使用平台 API Key 直接测试图片和视频模型，额度与计费仍由主站统一处理。</p></div>
+    <a class="brand" href="/">XDDAPI</a>
+  </header>
+  <section class="panel">
+    <div class="field"><label>统一接口地址<input id="baseUrl" readonly></label></div>
+    <div class="field"><label>API Key<input id="apiKey" type="password" autocomplete="off" placeholder="粘贴平台 API Key"></label></div>
+    <div class="mode" role="tablist" aria-label="测试类型"><button id="imageTab" class="active" type="button">图片</button><button id="videoTab" type="button">视频</button></div>
+    <div class="field"><label>模型<input id="model" value="gpt-image-2" placeholder="例如 gpt-image-2、seedance-1.0"></label></div>
+    <div class="field"><label>提示词<textarea id="prompt" placeholder="描述你要生成的内容"></textarea></label></div>
+    <div class="row">
+      <label>图片尺寸 / 视频比例<select id="size"><option>1024x1024</option><option>1536x1024</option><option>1024x1536</option><option>16:9</option><option>9:16</option></select></label>
+      <label id="durationField" hidden>视频时长（秒）<input id="duration" type="number" min="1" max="60" value="5"></label>
+    </div>
+    <div class="actions"><button class="primary" id="submit" type="button">开始测试</button><span class="status" id="status"></span></div>
+    <div class="result" id="result" hidden></div>
+    <div class="note">API Key 仅用于当前浏览器会话请求，不写入本服务数据库或日志。</div>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id)
+  const sidecarBase = window.location.pathname.startsWith('/playground') ? '/playground' : ''
+  let kind = 'image'
+  let pollTimer = null
+  let objectUrl = ''
+  const setStatus = (text, error = false) => { $('status').textContent = text; $('status').className = error ? 'status error' : 'status' }
+  const setKind = (next) => { kind = next; $('imageTab').classList.toggle('active', kind === 'image'); $('videoTab').classList.toggle('active', kind === 'video'); $('durationField').hidden = kind !== 'video'; $('model').value = kind === 'image' ? 'gpt-image-2' : 'seedance-1.0' }
+  $('imageTab').onclick = () => setKind('image')
+  $('videoTab').onclick = () => setKind('video')
+  const request = async (path, method, apiKey, payload) => {
+    const response = await fetch(`${sidecarBase}/api/proxy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, method, api_key: apiKey, payload }) })
+    const type = response.headers.get('content-type') || ''
+    const data = type.includes('json') ? await response.json() : await response.blob()
+    if (!response.ok) throw new Error(data?.error?.message || data?.message || data?.error || `请求失败（${response.status}）`)
+    return data
+  }
+  const showResult = (data) => { $('result').hidden = false; $('result').innerHTML = `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>` }
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))
+  const showImage = (data) => {
+    const item = data?.data?.[0] || data?.images?.[0] || data?.output?.[0]
+    const url = item?.url || item?.image_url || (item?.b64_json ? `data:image/png;base64,${item.b64_json}` : '')
+    $('result').hidden = false
+    $('result').innerHTML = url ? `<img alt="生成结果" src="${url}"><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>` : `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`
+  }
+  const pollVideo = async (apiKey, id) => {
+    for (let i = 0; i < 60; i += 1) {
+      const data = await request(`/v1/videos/${encodeURIComponent(id)}`, 'GET', apiKey)
+      const status = data?.status || data?.data?.status || ''
+      setStatus(`视频处理中：${status || 'processing'}（${i + 1}/60）`)
+      if (['completed', 'succeeded', 'done'].includes(String(status).toLowerCase())) { showResult(data); return }
+      if (['failed', 'error', 'cancelled'].includes(String(status).toLowerCase())) throw new Error(data?.error?.message || data?.error || '视频生成失败')
+      await new Promise((resolve) => { pollTimer = setTimeout(resolve, 3000) })
+    }
+    throw new Error('视频生成等待超时，请使用返回的任务 ID 查询')
+  }
+  $('submit').onclick = async () => {
+    const apiKey = $('apiKey').value.trim(); const prompt = $('prompt').value.trim(); const model = $('model').value.trim()
+    if (!apiKey || !prompt || !model) return setStatus('请填写 API Key、模型和提示词', true)
+    $('submit').disabled = true; $('result').hidden = true; setStatus('请求中…')
+    try {
+      if (kind === 'image') { const data = await request('/v1/images/generations', 'POST', apiKey, { model, prompt, size: $('size').value, n: 1 }); showImage(data); setStatus('生成完成') }
+      else { const data = await request('/v1/videos', 'POST', apiKey, { model, prompt, size: $('size').value, duration: Number($('duration').value) || 5 }); showResult(data); const id = data?.id || data?.data?.id; if (id) await pollVideo(apiKey, id); setStatus(id ? '生成完成' : '已提交，请查看返回结果') }
+    } catch (error) { setStatus(error instanceof Error ? error.message : '请求失败', true) } finally { $('submit').disabled = false }
+  }
+  fetch(`${sidecarBase}/api/config`).then((response) => response.json()).then((data) => { $('baseUrl').value = data.api_base_url || '' }).catch(() => setStatus('无法读取测试配置', true))
+  window.addEventListener('beforeunload', () => { if (pollTimer) clearTimeout(pollTimer); if (objectUrl) URL.revokeObjectURL(objectUrl) })
+</script>
+</body>
+</html>

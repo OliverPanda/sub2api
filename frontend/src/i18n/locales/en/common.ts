@@ -181,6 +181,7 @@ export default {
     channels: 'Channels',
     availableChannels: 'Available Channels',
     modelPlaza: 'Model Plaza',
+    playground: 'Quick Test',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     upstreamBalances: 'Upstream Balances',

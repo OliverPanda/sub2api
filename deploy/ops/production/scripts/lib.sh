@@ -39,20 +39,16 @@ compose() {
     --env-file "$ENV_FILE"
     -f "$COMPOSE_FILE"
   )
-  local sub2api_image="${SUB2API_IMAGE:-}" bridge_image="${BRIDGE_IMAGE:-}"
+  local sub2api_image="${SUB2API_IMAGE:-}" playground_image="${PLAYGROUND_IMAGE:-}"
   if [[ -f "$RELEASE_ENV" ]]; then
     args+=(--env-file "$RELEASE_ENV")
     sub2api_image=${sub2api_image:-$(env_get SUB2API_IMAGE "$RELEASE_ENV" || true)}
-    bridge_image=${bridge_image:-$(env_get BRIDGE_IMAGE "$RELEASE_ENV" || true)}
+    playground_image=${playground_image:-$(env_get PLAYGROUND_IMAGE "$RELEASE_ENV" || true)}
   fi
 
-  # The old single-image release metadata has no BRIDGE_IMAGE. Keep Compose
-  # parseable during the one-time migration without starting either application
-  # image from the placeholder. Command-local values do not leak into later
-  # Compose calls.
   sub2api_image=${sub2api_image:-ghcr.io/oliverpanda/sub2api:not-deployed}
-  bridge_image=${bridge_image:-ghcr.io/oliverpanda/sub2api-bridge:not-deployed}
-  SUB2API_IMAGE="$sub2api_image" BRIDGE_IMAGE="$bridge_image" \
+  playground_image=${playground_image:-ghcr.io/oliverpanda/sub2api-playground:not-deployed}
+  SUB2API_IMAGE="$sub2api_image" PLAYGROUND_IMAGE="$playground_image" \
     docker compose "${args[@]}" "$@"
 }
 

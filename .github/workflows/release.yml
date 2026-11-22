@@ -252,6 +252,16 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'skip' }}
         run: bash "$RUNNER_TEMP/release-tools/release-images.sh"
+      - name: Build and publish key-only playground sidecar
+        uses: docker/build-push-action@v6
+        with:
+          context: sidecar/playground
+          push: ${{ env.DRY_RUN != 'true' }}
+          load: ${{ env.DRY_RUN == 'true' }}
+          tags: ghcr.io/${{ needs.prepare.outputs.owner_lower }}/sub2api-playground:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ env.RELEASE_SHA }}
       - name: Get annotated tag notes
         id: tag_message
         run: |
