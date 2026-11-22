@@ -82,6 +82,7 @@ jobs:
           fi
 
           echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
+          echo "sha=${tag_sha}" >> "$GITHUB_OUTPUT"
           echo "deploy=true" >> "$GITHUB_OUTPUT"
           echo "Production release gate passed for ${latest_tag} -> ${tag_sha}"
 
@@ -202,7 +203,7 @@ jobs:
             -o ServerAliveCountMax=20 \
             -o LogLevel=ERROR \
             "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
-            "deploy ${RELEASE_TAG} ${IMAGE_DIGEST} ${PLAYGROUND_DIGEST} ${RELEASE_SHA}"
+          "deploy ${RELEASE_TAG} ${IMAGE_DIGEST} ${PLAYGROUND_DIGEST} ${{ steps.gate.outputs.sha }}"
 
       - name: Notify Telegram
         if: always()
