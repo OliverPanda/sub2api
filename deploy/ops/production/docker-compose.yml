@@ -28,7 +28,7 @@ services:
       - ./caddy_config:/config
     networks:
       edge:
-        ipv4_address: 172.30.0.10
+      ipv4_address: 172.31.0.10
     healthcheck:
       test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
       interval: 1m
@@ -53,7 +53,7 @@ services:
       AUTO_SETUP: "true"
       SERVER_HOST: "0.0.0.0"
       SERVER_PORT: "8080"
-      SERVER_TRUSTED_PROXIES: "172.30.0.10/32"
+      SERVER_TRUSTED_PROXIES: "172.31.0.10/32"
       SECURITY_TRUST_FORWARDED_IP_FOR_API_KEY_ACL: "false"
       DATABASE_HOST: "postgres"
       DATABASE_PORT: "5432"
@@ -175,7 +175,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.0.0/24
+        - subnet: 172.31.0.0/24
   backend:
     driver: bridge
     internal: true
