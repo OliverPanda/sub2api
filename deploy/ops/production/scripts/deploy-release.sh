@@ -238,7 +238,17 @@ verify_image() {
   local label_version label_revision
 
   log INFO "Pulling ${component} image ${image}"
-  docker pull "$image"
+  local attempt
+  for attempt in 1 2 3; do
+    if docker pull "$image"; then
+      break
+    fi
+    if [[ "$attempt" == 3 ]]; then
+      die "could not pull ${component} image after ${attempt} attempts"
+    fi
+    log WARN "Pulling ${component} image failed (attempt ${attempt}/3); retrying"
+    sleep 5
+  done
   label_version=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' 2>/dev/null || true)
   label_revision=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)
   [[ "$label_version" == "${version#v}" ]] \
