@@ -28,7 +28,7 @@ services:
       - ./caddy_config:/config
     networks:
       edge:
-      ipv4_address: 172.31.0.10
+        ipv4_address: 172.31.0.10
     healthcheck:
       test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
       interval: 1m
