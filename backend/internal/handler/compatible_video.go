@@ -137,6 +137,9 @@ func (h *OpenAIGatewayHandler) CompatibleVideo(c *gin.Context) {
 	ctx := service.WithOpenAIProfitControlSuppressed(c.Request.Context())
 	selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(ctx, key.GroupID, "", "", routingModel, nil, service.OpenAIUpstreamTransportHTTPSSE, service.OpenAIEndpointCapabilityVideoGeneration, false, false, false, service.PlatformOpenAI)
 	if err != nil || selection == nil || selection.Account == nil {
+		if err != nil {
+			reqLog.Warn("video.account_selection_failed", zap.Error(err))
+		}
 		h.errorResponse(c, 503, "video_no_eligible_account", "No eligible video_generation account")
 		return
 	}

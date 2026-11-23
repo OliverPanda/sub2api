@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>模型快速测试 | XDDAPI</title>
+  <title>模型游乐场 | XDDAPI</title>
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f7fb; color: #18212f; }
     * { box-sizing: border-box; }
@@ -38,7 +38,7 @@
 <body>
 <main>
   <header>
-    <div><h1>模型快速测试</h1><p>使用平台 API Key 直接测试图片和视频模型，额度与计费仍由主站统一处理。</p></div>
+    <div><h1>模型游乐场</h1><p>使用平台 API Key 直接测试图片和视频模型，额度与计费仍由主站统一处理。</p></div>
     <a class="brand" href="/">XDDAPI</a>
   </header>
   <section class="panel">
@@ -81,12 +81,23 @@
     $('result').hidden = false
     $('result').innerHTML = url ? `<img alt="生成结果" src="${url}"><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>` : `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`
   }
+  const showVideo = (content, data) => {
+    if (!(content instanceof Blob)) { showResult(data); return }
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
+    objectUrl = URL.createObjectURL(content)
+    $('result').hidden = false
+    $('result').innerHTML = `<video controls playsinline src="${objectUrl}"></video><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`
+  }
   const pollVideo = async (apiKey, id) => {
     for (let i = 0; i < 60; i += 1) {
       const data = await request(`/v1/videos/${encodeURIComponent(id)}`, 'GET', apiKey)
       const status = data?.status || data?.data?.status || ''
       setStatus(`视频处理中：${status || 'processing'}（${i + 1}/60）`)
-      if (['completed', 'succeeded', 'done'].includes(String(status).toLowerCase())) { showResult(data); return }
+      if (['completed', 'succeeded', 'done'].includes(String(status).toLowerCase())) {
+        const content = await request(`/v1/videos/${encodeURIComponent(id)}/content`, 'GET', apiKey)
+        showVideo(content, data)
+        return
+      }
       if (['failed', 'error', 'cancelled'].includes(String(status).toLowerCase())) throw new Error(data?.error?.message || data?.error || '视频生成失败')
       await new Promise((resolve) => { pollTimer = setTimeout(resolve, 3000) })
     }
@@ -95,6 +106,7 @@
   $('submit').onclick = async () => {
     const apiKey = $('apiKey').value.trim(); const prompt = $('prompt').value.trim(); const model = $('model').value.trim()
     if (!apiKey || !prompt || !model) return setStatus('请填写 API Key、模型和提示词', true)
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = '' }
     $('submit').disabled = true; $('result').hidden = true; setStatus('请求中…')
     try {
       if (kind === 'image') { const data = await request('/v1/images/generations', 'POST', apiKey, { model, prompt, size: $('size').value, n: 1 }); showImage(data); setStatus('生成完成') }

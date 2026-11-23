@@ -97,8 +97,8 @@ for runtime_dir in data postgres_data redis_data caddy_data caddy_config \
   fi
 done
 
-install -m 0644 "$SOURCE_DIR/docker-compose.yml" "$SUB2API_ROOT/compose.yml"
-install -m 0644 "$SOURCE_DIR/Caddyfile" "$SUB2API_ROOT/Caddyfile"
+install -m 0644 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$SOURCE_DIR/docker-compose.yml" "$SUB2API_ROOT/compose.yml"
+install -m 0644 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$SOURCE_DIR/Caddyfile" "$SUB2API_ROOT/Caddyfile"
 install -m 0644 "$SOURCE_DIR/.env.example" "$SUB2API_ROOT/.env.example"
 install -m 0600 "$SOURCE_DIR/dujiao/config.yml.example" "$SUB2API_ROOT/dujiao/config.yml.example"
 if [[ ! -f "$SUB2API_ROOT/bridge/config/skus.json" ]]; then

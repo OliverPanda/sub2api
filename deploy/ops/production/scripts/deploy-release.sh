@@ -74,6 +74,40 @@ validate_revision() {
   [[ "$1" =~ ^[0-9a-f]{40}$ ]]
 }
 
+sync_runtime_config() {
+  local repository=${DEPLOY_CONFIG_REPOSITORY:-OliverPanda/sub2api}
+  local config_ref=$EXPECTED_REVISION
+  local temp_dir config_path destination
+  [[ "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "DEPLOY_CONFIG_REPOSITORY is invalid"
+
+  temp_dir=$(mktemp -d "${SUB2API_ROOT}/state/config-sync.XXXXXX")
+  for config_path in deploy/ops/production/docker-compose.yml deploy/ops/production/Caddyfile; do
+    destination=${SUB2API_ROOT}/$(basename "$config_path" | sed 's/docker-compose.yml/compose.yml/')
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+      --max-time 30 "https://raw.githubusercontent.com/${repository}/${config_ref}/${config_path}" \
+      -o "${temp_dir}/$(basename "$destination")"
+    [[ -s "${temp_dir}/$(basename "$destination")" ]] || die "downloaded ${config_path} is empty"
+    cp -p "$destination" "${temp_dir}/$(basename "$destination").previous"
+  done
+
+  install -m 0644 "${temp_dir}/compose.yml" "${SUB2API_ROOT}/compose.yml"
+  install -m 0644 "${temp_dir}/Caddyfile" "${SUB2API_ROOT}/Caddyfile"
+  if ! compose config --quiet; then
+    cp -p "${temp_dir}/compose.yml.previous" "${SUB2API_ROOT}/compose.yml"
+    cp -p "${temp_dir}/Caddyfile.previous" "${SUB2API_ROOT}/Caddyfile"
+    rm -rf "$temp_dir"
+    die "downloaded production Compose configuration is invalid"
+  fi
+  if ! compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile; then
+    cp -p "${temp_dir}/compose.yml.previous" "${SUB2API_ROOT}/compose.yml"
+    cp -p "${temp_dir}/Caddyfile.previous" "${SUB2API_ROOT}/Caddyfile"
+    rm -rf "$temp_dir"
+    die "downloaded production Caddy configuration is invalid"
+  fi
+  rm -rf "$temp_dir"
+  log INFO "Synchronized production Compose and Caddy configuration at ${config_ref}"
+}
+
 wait_service_healthy() {
   local service=$1 timeout=${2:-180} started=$SECONDS id status
   while (( SECONDS - started < timeout )); do
@@ -385,6 +419,7 @@ TARGET_SUB2API_IMAGE="${GHCR_SUB2API_IMAGE_BASE}@${SUB2API_DIGEST}"
 TARGET_PLAYGROUND_IMAGE="${GHCR_PLAYGROUND_IMAGE_BASE}@${PLAYGROUND_DIGEST}"
 
 log INFO "Deploying ${VERSION}: sub2api=${SUB2API_DIGEST} playground=${PLAYGROUND_DIGEST}"
+sync_runtime_config
 capture_previous_release
 if [[ -n "$PREVIOUS_VERSION" ]]; then
   [[ "$PREVIOUS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "current release version is invalid: ${PREVIOUS_VERSION}"

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   createVideoModelPricesForm,
   addVideoModelPrice,
+  renameVideoModelPrice,
+  removeVideoModelPrice,
   serializeVideoModelPrices,
   videoModelPriceFamilyRows,
   videoPriceResolutions
@@ -67,5 +69,33 @@ it('keeps MiniMax quality tiers separate from flat low-resolution prices', () =>
 })
 
 it('offers the shared quality tiers for every compatible upstream model', () => {
-  expect(videoPriceResolutions('openai').map(({ key }) => key)).toEqual(['480p', '720p', '768p', '1080p', '2k'])
+  expect(videoPriceResolutions('openai').map(({ key }) => key)).toEqual(['480p', '720p', '768p', '1080p', '2k', '4k'])
+})
+
+describe('video model row editing', () => {
+  it('renames a model while preserving its prices', () => {
+    const form = createVideoModelPricesForm({ 'seedance2.5': { '480p': 0.44 } })
+
+    expect(renameVideoModelPrice(form, 'seedance2.5', 'seedance-2.5')).toBe(true)
+    expect(form['seedance-2.5']['480p']).toBe(0.44)
+    expect(videoModelPriceFamilyRows(form).map(({ key }) => key)).toContain('seedance-2.5')
+    expect(videoModelPriceFamilyRows(form).map(({ key }) => key)).not.toContain('seedance2.5')
+  })
+
+  it('rejects duplicate names and removes a row', () => {
+    const form = createVideoModelPricesForm({ first: { '480p': 0.1 }, second: { '720p': 0.2 } })
+
+    expect(renameVideoModelPrice(form, 'first', 'second')).toBe(false)
+    expect(removeVideoModelPrice(form, 'first')).toBe(true)
+    expect(videoModelPriceFamilyRows(form).map(({ key }) => key)).not.toContain('first')
+    expect(form.second['720p']).toBe(0.2)
+  })
+
+  it('does not re-add a deleted default Grok row', () => {
+    const form = createVideoModelPricesForm()
+
+    expect(removeVideoModelPrice(form, 'grok-imagine-video')).toBe(true)
+    expect(videoModelPriceFamilyRows(form).map(({ key }) => key)).not.toContain('grok-imagine-video')
+    expect(serializeVideoModelPrices(form)).not.toHaveProperty('grok-imagine-video')
+  })
 })

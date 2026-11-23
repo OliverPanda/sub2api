@@ -565,6 +565,11 @@ export default {
         resetStatus: 'Reset Status',
         refreshToken: 'Refresh Token',
         probeUpstreamBilling: 'Probe Upstream Rate',
+        syncUpstreamModels: 'Sync Upstream Models',
+        syncUpstreamModelsLoading: 'Syncing upstream models...',
+        syncUpstreamModelsSuccess: 'Synced upstream models for {count} account(s)',
+        syncUpstreamModelsPartial: 'Upstream model sync partially completed: {success} succeeded, {failed} failed',
+        syncUpstreamModelsFailed: 'Failed to sync upstream models in bulk',
         resetStatusSuccess: 'Successfully reset {count} account(s) status',
         refreshTokenSuccess: 'Successfully refreshed {count} account(s) token',
         partialSuccess: 'Partially completed: {success} succeeded, {failed} failed'

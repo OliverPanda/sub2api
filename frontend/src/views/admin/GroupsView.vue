@@ -1143,33 +1143,64 @@
               <input v-model="createVideoModelName" class="input" :placeholder="t('admin.groups.videoPricing.modelNamePlaceholder')" />
               <button type="button" class="btn btn-secondary whitespace-nowrap" @click="addVideoModelPrice(createForm.video_model_prices, createVideoModelName) && (createVideoModelName = '')">{{ t('admin.groups.videoPricing.addModel') }}</button>
             </div>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
-                :key="family.key"
-                class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in videoPriceResolutions(createForm.platform)"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="createForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`create-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
+            <div class="mt-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-dark-600">
+              <table class="min-w-[1120px] w-full table-fixed border-collapse text-left text-sm" :data-render-version="videoModelPriceRenderVersion">
+                <caption class="sr-only">{{ t("admin.groups.videoPricing.modelOverridesTitle") }}</caption>
+                <colgroup>
+                  <col class="w-64" />
+                  <col v-for="resolution in videoPriceResolutions(createForm.platform)" :key="resolution.key" class="w-36" />
+                </colgroup>
+                <thead class="bg-gray-50 dark:bg-dark-800">
+                  <tr class="border-b border-gray-200 dark:border-dark-600">
+                    <th scope="col" class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 px-3 py-2.5 font-medium text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300">
+                      {{ t("admin.groups.videoPricing.modelNamePlaceholder") }}
+                    </th>
+                    <th
+                      v-for="resolution in videoPriceResolutions(createForm.platform)"
+                      :key="resolution.key"
+                      scope="col"
+                      class="px-3 py-2.5 font-medium text-gray-600 dark:text-gray-300"
+                    >
+                      {{ resolution.label }} ($/s)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-dark-600">
+                  <tr v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)" :key="family.key">
+                    <th scope="row" class="sticky left-0 z-[1] border-r border-gray-200 bg-white px-2 py-2 dark:border-dark-600 dark:bg-dark-900">
+                      <div class="flex items-center gap-2">
+                        <input
+                          :value="family.label"
+                          type="text"
+                          class="input min-w-0 flex-1 font-mono text-xs"
+                          :aria-label="family.label"
+                          @blur="commitVideoModelRename(createForm.video_model_prices, family.key, $event)"
+                          @keydown.enter.prevent="blurVideoModelNameInput"
+                        />
+                        <button
+                          type="button"
+                          class="btn-ghost btn-icon shrink-0 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+                          :title="t('common.delete')"
+                          :aria-label="t('common.delete')"
+                          @click="deleteVideoModelRow(createForm.video_model_prices, family.key)"
+                        >
+                          <Icon name="trash" size="sm" />
+                        </button>
+                      </div>
+                    </th>
+                    <td v-for="resolution in videoPriceResolutions(createForm.platform)" :key="resolution.key" class="p-2">
+                      <input
+                        v-model.number="createForm.video_model_prices[family.key][resolution.key]"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        class="input min-w-28"
+                        :data-testid="`create-grok-video-price-${family.key}-${resolution.key}`"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
@@ -2801,33 +2832,64 @@
               <input v-model="editVideoModelName" class="input" :placeholder="t('admin.groups.videoPricing.modelNamePlaceholder')" />
               <button type="button" class="btn btn-secondary whitespace-nowrap" @click="addVideoModelPrice(editForm.video_model_prices, editVideoModelName) && (editVideoModelName = '')">{{ t('admin.groups.videoPricing.addModel') }}</button>
             </div>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
-                :key="family.key"
-                class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in videoPriceResolutions(editForm.platform)"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="editForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`edit-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
+            <div class="mt-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-dark-600">
+              <table class="min-w-[1120px] w-full table-fixed border-collapse text-left text-sm" :data-render-version="videoModelPriceRenderVersion">
+                <caption class="sr-only">{{ t("admin.groups.videoPricing.modelOverridesTitle") }}</caption>
+                <colgroup>
+                  <col class="w-64" />
+                  <col v-for="resolution in videoPriceResolutions(editForm.platform)" :key="resolution.key" class="w-36" />
+                </colgroup>
+                <thead class="bg-gray-50 dark:bg-dark-800">
+                  <tr class="border-b border-gray-200 dark:border-dark-600">
+                    <th scope="col" class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 px-3 py-2.5 font-medium text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300">
+                      {{ t("admin.groups.videoPricing.modelNamePlaceholder") }}
+                    </th>
+                    <th
+                      v-for="resolution in videoPriceResolutions(editForm.platform)"
+                      :key="resolution.key"
+                      scope="col"
+                      class="px-3 py-2.5 font-medium text-gray-600 dark:text-gray-300"
+                    >
+                      {{ resolution.label }} ($/s)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-dark-600">
+                  <tr v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)" :key="family.key">
+                    <th scope="row" class="sticky left-0 z-[1] border-r border-gray-200 bg-white px-2 py-2 dark:border-dark-600 dark:bg-dark-900">
+                      <div class="flex items-center gap-2">
+                        <input
+                          :value="family.label"
+                          type="text"
+                          class="input min-w-0 flex-1 font-mono text-xs"
+                          :aria-label="family.label"
+                          @blur="commitVideoModelRename(editForm.video_model_prices, family.key, $event)"
+                          @keydown.enter.prevent="blurVideoModelNameInput"
+                        />
+                        <button
+                          type="button"
+                          class="btn-ghost btn-icon shrink-0 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+                          :title="t('common.delete')"
+                          :aria-label="t('common.delete')"
+                          @click="deleteVideoModelRow(editForm.video_model_prices, family.key)"
+                        >
+                          <Icon name="trash" size="sm" />
+                        </button>
+                      </div>
+                    </th>
+                    <td v-for="resolution in videoPriceResolutions(editForm.platform)" :key="resolution.key" class="p-2">
+                      <input
+                        v-model.number="editForm.video_model_prices[family.key][resolution.key]"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        class="input min-w-28"
+                        :data-testid="`edit-grok-video-price-${family.key}-${resolution.key}`"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
@@ -4413,6 +4475,8 @@ import {
 import {
   createVideoModelPricesForm,
   addVideoModelPrice,
+  renameVideoModelPrice,
+  removeVideoModelPrice,
   videoPriceResolutions,
   serializeVideoModelPrices,
   videoModelPriceFamilyRows,
@@ -4980,6 +5044,30 @@ const submitEditAllowlistCustomEntry = () => {
 
 const createVideoModelName = ref('');
 const editVideoModelName = ref('');
+const videoModelPriceRenderVersion = ref(0);
+const blurVideoModelNameInput = (event: Event) => {
+  (event.currentTarget as HTMLInputElement).blur();
+};
+const commitVideoModelRename = (
+  form: Record<string, Record<string, number | string | null>>,
+  currentModel: string,
+  event: Event,
+) => {
+  const input = event.target as HTMLInputElement;
+  if (!renameVideoModelPrice(form, currentModel, input.value)) {
+    input.value = currentModel;
+  } else {
+    videoModelPriceRenderVersion.value += 1;
+  }
+};
+const deleteVideoModelRow = (
+  form: Record<string, Record<string, number | string | null>>,
+  model: string,
+) => {
+  if (removeVideoModelPrice(form, model)) {
+    videoModelPriceRenderVersion.value += 1;
+  }
+};
 const createForm = reactive({
   name: "",
   description: "",

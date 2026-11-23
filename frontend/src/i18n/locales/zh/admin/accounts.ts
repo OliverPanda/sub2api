@@ -685,6 +685,11 @@ export default {
         resetStatus: '批量重置状态',
         refreshToken: '批量刷新令牌',
         probeUpstreamBilling: '探测上游倍率',
+        syncUpstreamModels: '批量同步上游模型',
+        syncUpstreamModelsLoading: '正在同步上游模型...',
+        syncUpstreamModelsSuccess: '已同步 {count} 个账号的上游模型',
+        syncUpstreamModelsPartial: '上游模型同步部分完成：成功 {success} 个，失败 {failed} 个',
+        syncUpstreamModelsFailed: '批量同步上游模型失败',
         resetStatusSuccess: '已成功重置 {count} 个账号状态',
         refreshTokenSuccess: '已成功刷新 {count} 个账号令牌',
         partialSuccess: '操作部分完成：{success} 成功，{failed} 失败'

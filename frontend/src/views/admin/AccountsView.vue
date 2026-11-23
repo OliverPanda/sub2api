@@ -184,6 +184,8 @@
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
           @probe-upstream-billing="handleBulkProbeUpstreamBilling"
+          :syncing-upstream-models="syncingUpstreamModels"
+          @sync-upstream-models="handleBulkSyncUpstreamModels"
           @edit-selected="openBulkEditSelected"
           @edit-filtered="openBulkEditFiltered"
           @clear="clearSelection"
@@ -537,6 +539,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
+import { buildModelMappingObject, splitModelMappingObject } from '@/composables/useModelWhitelist'
 import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
@@ -622,6 +625,7 @@ const togglingSchedulable = ref<number | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, anchorRect:DOMRect|null}>({ show: false, acc: null, anchorRect: null })
 const exportingData = ref(false)
 const probingUpstreamBilling = reactive(new Set<number>())
+const syncingUpstreamModels = ref(false)
 const upstreamBillingProbeGloballyEnabled = ref<boolean | undefined>(undefined)
 const upstreamBillingNow = ref(Date.now())
 const upstreamBillingRateETag = ref<string | null>(null)
@@ -1945,6 +1949,51 @@ const handleBulkProbeUpstreamBilling = async () => {
     appStore.showError(extractApiErrorMessage(error, t('admin.accounts.upstreamBilling.probeFailed')))
   } finally {
     accountIDs.forEach(id => probingUpstreamBilling.delete(id))
+  }
+}
+const handleBulkSyncUpstreamModels = async () => {
+  const accountIds = [...selIds.value]
+  if (accountIds.length === 0 || syncingUpstreamModels.value) return
+
+  syncingUpstreamModels.value = true
+  const failedIds: number[] = []
+  try {
+    for (const accountId of accountIds) {
+      try {
+        const result = await adminAPI.accounts.syncUpstreamModels(accountId)
+        const account = await adminAPI.accounts.getById(accountId)
+        const credentials = { ...(account.credentials ?? {}) }
+        const current = splitModelMappingObject(
+          credentials.model_mapping as Record<string, unknown> | undefined
+        )
+        const allowedModels = [...new Set([...current.allowedModels, ...result.models])]
+        const modelMapping = buildModelMappingObject('combined', allowedModels, current.modelMappings)
+        if (modelMapping) credentials.model_mapping = modelMapping
+        else delete credentials.model_mapping
+        await adminAPI.accounts.update(accountId, { credentials })
+      } catch (error) {
+        failedIds.push(accountId)
+        console.error(`Failed to sync upstream models for account ${accountId}:`, error)
+      }
+    }
+
+    const successCount = accountIds.length - failedIds.length
+    if (failedIds.length > 0) {
+      setSelectedIds(failedIds)
+      appStore.showError(t('admin.accounts.bulkActions.syncUpstreamModelsPartial', {
+        success: successCount,
+        failed: failedIds.length
+      }))
+    } else {
+      clearSelection()
+      appStore.showSuccess(t('admin.accounts.bulkActions.syncUpstreamModelsSuccess', { count: successCount }))
+    }
+    await reload()
+  } catch (error) {
+    console.error('Failed to sync upstream models in batch:', error)
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.bulkActions.syncUpstreamModelsFailed')))
+  } finally {
+    syncingUpstreamModels.value = false
   }
 }
 const updateSchedulableInList = (accountIds: number[], schedulable: boolean) => {

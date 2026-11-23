@@ -82,17 +82,46 @@ export function serializeVideoModelPrices(form: VideoModelPricesForm): VideoMode
 
 export function videoModelPriceFamilyRows(form: VideoModelPricesForm) {
   const known = new Set<string>(grokVideoPriceFamilies.map(({ key }) => key))
-  const extra = Object.keys(form)
-    .map(normalizeFamily)
+  const present = new Set(Object.keys(form).map(normalizeFamily))
+  const presentKnown = grokVideoPriceFamilies.filter(({ key }) =>
+    present.has(key)
+  )
+  const extra = [...present]
     .filter((family) => family && !known.has(family))
     .sort()
     .map((key) => ({ key, label: key }))
-  return [...grokVideoPriceFamilies, ...extra]
+  return [...presentKnown, ...extra]
 }
 
 export function addVideoModelPrice(form: VideoModelPricesForm, model: string): boolean {
   const key = normalizeFamily(model)
-  if (!key || key === '__proto__' || Object.prototype.hasOwnProperty.call(form, key)) return false
+  if (!key || key === '__proto__') return false
+  if (Object.prototype.hasOwnProperty.call(form, key)) return false
   form[key] = emptyTiers()
+  return true
+}
+
+export function renameVideoModelPrice(
+  form: VideoModelPricesForm,
+  currentModel: string,
+  nextModel: string
+): boolean {
+  const currentKey = normalizeFamily(currentModel)
+  const nextKey = normalizeFamily(nextModel)
+  if (!currentKey || !nextKey || nextKey === '__proto__' || !Object.prototype.hasOwnProperty.call(form, currentKey)) {
+    return false
+  }
+  if (currentKey === nextKey) return true
+  if (Object.prototype.hasOwnProperty.call(form, nextKey)) return false
+
+  form[nextKey] = form[currentKey]
+  delete form[currentKey]
+  return true
+}
+
+export function removeVideoModelPrice(form: VideoModelPricesForm, model: string): boolean {
+  const key = normalizeFamily(model)
+  if (!key || !Object.prototype.hasOwnProperty.call(form, key)) return false
+  delete form[key]
   return true
 }

@@ -12,7 +12,7 @@ const maxBodyBytes = 16 * 1024 * 1024
 const allowedPaths = [
   /^\/images\/(generations|edits)$/,
   /^\/videos(?:\/generations)?$/,
-  /^\/videos\/[A-Za-z0-9:_-]+(?:\/content)?$/
+  /^\/videos\/(?:[A-Za-z0-9:_-]|%2F|%2f)+(?:\/content)?$/
 ]
 
 function json(res, status, data) {
