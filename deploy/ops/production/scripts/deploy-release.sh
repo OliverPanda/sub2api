@@ -74,22 +74,47 @@ validate_revision() {
   [[ "$1" =~ ^[0-9a-f]{40}$ ]]
 }
 
+# shortcut: pre-sync hosts need one-time repair, migrate the forced SSH command to a self-updating launcher to remove it.
 sync_runtime_config() {
   local repository=${DEPLOY_CONFIG_REPOSITORY:-OliverPanda/sub2api}
   local config_ref=$EXPECTED_REVISION
-  local temp_dir config_path destination
+  local temp_dir config_path destination downloaded
+  local -a runtime_files=(
+    deploy/ops/production/docker-compose.yml
+    deploy/ops/production/Caddyfile
+    deploy/ops/production/scripts/backup-postgres.sh
+    deploy/ops/production/scripts/configure-firewall.sh
+    deploy/ops/production/scripts/deploy-release.sh
+    deploy/ops/production/scripts/lib.sh
+    deploy/ops/production/scripts/notify-telegram.sh
+    deploy/ops/production/scripts/refresh-cloudflare-ranges.sh
+    deploy/ops/production/scripts/refresh-cloudflare-trusted-proxies.sh
+    deploy/ops/production/scripts/smoke-test.sh
+    deploy/ops/production/scripts/sync-cloudflare-dns.sh
+    deploy/ops/production/scripts/wait-health.sh
+  )
   [[ "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "DEPLOY_CONFIG_REPOSITORY is invalid"
 
   temp_dir=$(mktemp -d "${SUB2API_ROOT}/state/config-sync.XXXXXX")
-  for config_path in deploy/ops/production/docker-compose.yml deploy/ops/production/Caddyfile; do
-    destination=${SUB2API_ROOT}/$(basename "$config_path" | sed 's/docker-compose.yml/compose.yml/')
+  for config_path in "${runtime_files[@]}"; do
+    case "$config_path" in
+      deploy/ops/production/docker-compose.yml) destination=${SUB2API_ROOT}/compose.yml ;;
+      deploy/ops/production/Caddyfile) destination=${SUB2API_ROOT}/Caddyfile ;;
+      deploy/ops/production/scripts/*.sh) destination=${SUB2API_ROOT}/bin/$(basename "$config_path") ;;
+      *) rm -rf "$temp_dir"; die "unsupported runtime file ${config_path}" ;;
+    esac
+    downloaded=${temp_dir}/$(basename "$destination")
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
       --max-time 30 "https://raw.githubusercontent.com/${repository}/${config_ref}/${config_path}" \
-      -o "${temp_dir}/$(basename "$destination")"
-    [[ -s "${temp_dir}/$(basename "$destination")" ]] || die "downloaded ${config_path} is empty"
-    cp -p "$destination" "${temp_dir}/$(basename "$destination").previous"
+      -o "$downloaded"
+    [[ -s "$downloaded" ]] || { rm -rf "$temp_dir"; die "downloaded ${config_path} is empty"; }
+    if [[ "$config_path" == *.sh ]]; then
+      bash -n "$downloaded" || { rm -rf "$temp_dir"; die "downloaded ${config_path} has invalid shell syntax"; }
+    fi
   done
 
+  cp -p "${SUB2API_ROOT}/compose.yml" "${temp_dir}/compose.yml.previous"
+  cp -p "${SUB2API_ROOT}/Caddyfile" "${temp_dir}/Caddyfile.previous"
   install -m 0644 "${temp_dir}/compose.yml" "${SUB2API_ROOT}/compose.yml"
   install -m 0644 "${temp_dir}/Caddyfile" "${SUB2API_ROOT}/Caddyfile"
   if ! compose config --quiet; then
@@ -104,8 +129,17 @@ sync_runtime_config() {
     rm -rf "$temp_dir"
     die "downloaded production Caddy configuration is invalid"
   fi
+
+  for config_path in "${runtime_files[@]}"; do
+    case "$config_path" in
+      deploy/ops/production/docker-compose.yml|deploy/ops/production/Caddyfile) continue ;;
+      deploy/ops/production/scripts/*.sh) destination=${SUB2API_ROOT}/bin/$(basename "$config_path") ;;
+      *) rm -rf "$temp_dir"; die "unsupported runtime file ${config_path}" ;;
+    esac
+    install -m 0755 "${temp_dir}/$(basename "$destination")" "$destination"
+  done
   rm -rf "$temp_dir"
-  log INFO "Synchronized production Compose and Caddy configuration at ${config_ref}"
+  log INFO "Synchronized production Compose, Caddy, and deployment scripts at ${config_ref}"
 }
 
 wait_service_healthy() {
@@ -419,7 +453,11 @@ TARGET_SUB2API_IMAGE="${GHCR_SUB2API_IMAGE_BASE}@${SUB2API_DIGEST}"
 TARGET_PLAYGROUND_IMAGE="${GHCR_PLAYGROUND_IMAGE_BASE}@${PLAYGROUND_DIGEST}"
 
 log INFO "Deploying ${VERSION}: sub2api=${SUB2API_DIGEST} playground=${PLAYGROUND_DIGEST}"
-sync_runtime_config
+if [[ "${DEPLOY_RUNTIME_SYNCED:-}" != "1" ]]; then
+  sync_runtime_config
+  export DEPLOY_RUNTIME_SYNCED=1
+  exec "${SUB2API_ROOT}/bin/deploy-release" "$@"
+fi
 capture_previous_release
 if [[ -n "$PREVIOUS_VERSION" ]]; then
   [[ "$PREVIOUS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "current release version is invalid: ${PREVIOUS_VERSION}"

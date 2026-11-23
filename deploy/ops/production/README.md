@@ -351,6 +351,7 @@ git push origin main
 6. 自动维护两条 Cloudflare DNS 记录和 Zone TLS 设置。
 7. GitHub Runner 加入 `tag:ci`，通过 Tailscale SSH 执行受限部署命令。
 8. 服务器备份数据库、拉取固定 digest、重建 Sub2API 和 Bridge、检查 Caddy 和公网。
+   部署开始时会按本次提交同步生产 Compose、Caddy 和部署脚本，并在替换前完成语法与配置校验，随后使用同步后的部署脚本继续执行。
 9. 任一阶段失败时，自动恢复上一组应用镜像。
 10. Telegram 发送结果。
 
