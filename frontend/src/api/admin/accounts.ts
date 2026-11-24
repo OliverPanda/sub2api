@@ -1059,7 +1059,7 @@ export async function probeUpstreamBillingBatch(accountIds: number[]): Promise<U
   return data.results
 }
 
-export async function getUpstreamBalances(page = 1, pageSize = 100): Promise<UpstreamBalancesResponse> {
+export async function getUpstreamBalances(): Promise<UpstreamBalancesResponse> {
   const { data } = await apiClient.get<UpstreamBalancesResponse>('/admin/accounts/upstream-balances')
   return data
 }
