@@ -81,16 +81,28 @@ async function proxy(req, res) {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
-    if (req.method === 'GET' && url.pathname === '/health') {
+    if (['GET', 'HEAD'].includes(req.method) && url.pathname === '/health') {
+      if (req.method === 'HEAD') {
+        res.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' })
+        return res.end()
+      }
       return json(res, 200, { status: 'ok' })
     }
-    if (req.method === 'GET' && url.pathname === '/api/config') {
+    if (['GET', 'HEAD'].includes(req.method) && url.pathname === '/api/config') {
+      if (req.method === 'HEAD') {
+        res.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' })
+        return res.end()
+      }
       return json(res, 200, { api_base_url: apiBaseUrl })
     }
     if (req.method === 'POST' && url.pathname === '/api/proxy') {
       return await proxy(req, res)
     }
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    if (['GET', 'HEAD'].includes(req.method) && (url.pathname === '/' || url.pathname === '/index.html')) {
+      if (req.method === 'HEAD') {
+        res.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/html; charset=utf-8' })
+        return res.end()
+      }
       const html = await readFile(path.join(root, 'index.html'))
       res.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/html; charset=utf-8' })
       return res.end(html)
