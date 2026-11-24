@@ -81,6 +81,7 @@ chown root:root "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy" \
   "$SUB2API_ROOT/dujiao" "$SUB2API_ROOT/bridge" "$SUB2API_ROOT/bridge/config"
 chmod 0755 "$SUB2API_ROOT" "$SUB2API_ROOT/bin" "$SUB2API_ROOT/caddy" \
   "$SUB2API_ROOT/dujiao" "$SUB2API_ROOT/bridge" "$SUB2API_ROOT/bridge/config"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$SUB2API_ROOT" "$SUB2API_ROOT/bin"
 install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" \
   "$SUB2API_ROOT/.ssh" \
   "$SUB2API_ROOT/.docker" \
