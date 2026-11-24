@@ -123,7 +123,13 @@ sync_runtime_config() {
     rm -rf "$temp_dir"
     die "downloaded production Compose configuration is invalid"
   fi
-  if ! compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile; then
+  if ! docker run --rm --network none \
+    --env "PUBLIC_DOMAIN=$(env_get PUBLIC_DOMAIN || echo api.xddapi.org.uk)" \
+    --volume "${SUB2API_ROOT}/Caddyfile:/etc/caddy/Caddyfile:ro" \
+    --volume "${SUB2API_ROOT}/caddy/cloudflare-trusted-proxies.caddy:/etc/caddy/cloudflare-trusted-proxies.caddy:ro" \
+    --volume "${SUB2API_ROOT}/caddy/origin.pem:/etc/caddy/certs/origin.pem:ro" \
+    --volume "${SUB2API_ROOT}/caddy/origin.key:/etc/caddy/certs/origin.key:ro" \
+    caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile; then
     cp -p "${temp_dir}/compose.yml.previous" "${SUB2API_ROOT}/compose.yml"
     cp -p "${temp_dir}/Caddyfile.previous" "${SUB2API_ROOT}/Caddyfile"
     rm -rf "$temp_dir"
