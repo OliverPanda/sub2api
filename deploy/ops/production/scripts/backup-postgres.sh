@@ -55,9 +55,19 @@ backup_database() {
   chmod 0600 "${final}.sha256"
 }
 
-backup_database postgres sub2api
-backup_database bridge-postgres bridge
-backup_database dujiao-postgres dujiao
+database_services=()
+services=$(compose config --services) || die "could not list Compose services"
+while IFS= read -r service; do
+  case "$service" in
+    postgres) database_services+=("postgres:sub2api") ;;
+    *-postgres) database_services+=("${service}:${service%-postgres}") ;;
+  esac
+done <<< "$services"
+(( ${#database_services[@]} > 0 )) || die "no PostgreSQL services are configured"
+
+for database in "${database_services[@]}"; do
+  backup_database "${database%%:*}" "${database#*:}"
+done
 
 {
   printf 'created_at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"

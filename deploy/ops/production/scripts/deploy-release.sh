@@ -456,6 +456,7 @@ log INFO "Deploying ${VERSION}: sub2api=${SUB2API_DIGEST} playground=${PLAYGROUN
 if [[ "${DEPLOY_RUNTIME_SYNCED:-}" != "1" ]]; then
   sync_runtime_config
   export DEPLOY_RUNTIME_SYNCED=1
+  exec 9>&-
   exec "${SUB2API_ROOT}/bin/deploy-release" "$@"
 fi
 capture_previous_release
