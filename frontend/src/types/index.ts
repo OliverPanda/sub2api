@@ -1188,23 +1188,13 @@ export interface UpstreamBillingData {
 
 export interface UpstreamBalanceItem {
   base_url: string
-  accounts: number
-  ok_accounts: number
+  groups: string[]
   balance?: number
-  currency?: string
   has_balance: boolean
-  received_at?: string
-  stale?: boolean
-  probe_status?: string
-  last_error?: string
 }
 
 export interface UpstreamBalancesResponse {
   items: UpstreamBalanceItem[]
-  total: number
-  has_total: boolean
-  probe_failed: number
-  accounts: number
 }
 
 export type UpstreamBillingProbeStatus = 'ok' | 'unsupported' | 'failed'

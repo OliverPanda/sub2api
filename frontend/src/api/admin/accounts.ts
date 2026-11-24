@@ -1060,9 +1060,7 @@ export async function probeUpstreamBillingBatch(accountIds: number[]): Promise<U
 }
 
 export async function getUpstreamBalances(page = 1, pageSize = 100): Promise<UpstreamBalancesResponse> {
-  const { data } = await apiClient.get<UpstreamBalancesResponse>('/admin/accounts/upstream-balances', {
-    params: { page, page_size: pageSize }
-  })
+  const { data } = await apiClient.get<UpstreamBalancesResponse>('/admin/accounts/upstream-balances')
   return data
 }
 

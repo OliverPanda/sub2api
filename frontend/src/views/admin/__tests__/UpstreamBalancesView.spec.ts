@@ -42,6 +42,7 @@ const i18n = createI18n({
             partialHint: 'Partial hint',
             receivedAt: 'Updated: {value}',
             balanceColumn: 'Balance',
+            groupsColumn: 'Groups',
             receivedAtTitle: 'Updated',
             upstreamColumn: 'Upstream',
             accountsColumn: 'Probed/Accounts',
@@ -72,13 +73,9 @@ describe('UpstreamBalancesView', () => {
   beforeEach(() => {
     mocks.getUpstreamBalances.mockReset().mockResolvedValue({
       items: [
-        { base_url: 'https://upstream-a.example', accounts: 2, ok_accounts: 2, balance: 32.5, has_balance: true, probe_status: 'ok', received_at: '2026-10-27T00:00:00Z' },
-        { base_url: 'https://upstream-b.example', accounts: 1, ok_accounts: 0, has_balance: false, probe_status: 'failed' }
-      ],
-      total: 32.5,
-      has_total: true,
-      probe_failed: 1,
-      accounts: 3
+        { base_url: 'https://upstream-a.example', groups: ['alpha', 'beta'], balance: 32.5, has_balance: true },
+        { base_url: 'https://upstream-b.example', groups: [], has_balance: false }
+      ]
     })
   })
 
@@ -86,10 +83,9 @@ describe('UpstreamBalancesView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(mocks.getUpstreamBalances).toHaveBeenCalledWith(1, 100)
-    expect(wrapper.get('[data-testid="upstream-balances-total"]').text()).toBe('$32.50')
-    const items = wrapper.findAll('[data-testid="upstream-balance-item"]')
-    expect(items.map((i) => i.text())).toEqual(['$32.50', 'admin.accounts.upstreamBalances.unknown'])
+    expect(mocks.getUpstreamBalances).toHaveBeenCalledWith()
+    expect(wrapper.text()).toContain('alpha, beta')
+    expect(wrapper.text()).toContain('Unknown')
     expect(wrapper.text()).toContain('https://upstream-a.example')
     expect(wrapper.text()).toContain('$32.50')
     wrapper.unmount()

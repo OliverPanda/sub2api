@@ -234,6 +234,7 @@ export default {
         partialHint: '部分账号未上报余额，总余额仅包含已探测成功的账号。',
         receivedAt: '更新于：{value}',
         balanceColumn: '余额',
+        groupsColumn: '涉及分组',
         receivedAtTitle: '更新时间',
         upstreamColumn: '上游地址',
         accountsColumn: '探测/账号',
