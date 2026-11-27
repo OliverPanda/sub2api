@@ -394,6 +394,8 @@ export default {
         partialHint: 'Some accounts did not report a balance; the total includes probed accounts only.',
         receivedAt: 'Updated: {value}',
         balanceColumn: 'Balance',
+        quotaColumn: 'Used / limit',
+        unlimited: 'Unlimited',
         groupsColumn: 'Groups',
         receivedAtTitle: 'Updated',
         upstreamColumn: 'Upstream',

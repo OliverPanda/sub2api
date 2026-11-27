@@ -28,6 +28,10 @@ type keyBillingInfoResponse struct {
 	EffectiveRateMultiplier float64   `json:"effective_rate_multiplier"`
 	Timezone                *string   `json:"timezone,omitempty"`
 	ObservedAt              time.Time `json:"observed_at"`
+	Quota                   float64   `json:"quota"`
+	QuotaUsed               float64   `json:"quota_used"`
+	Balance                 *float64  `json:"balance,omitempty"`
+	QuotaUnlimited          bool      `json:"quota_unlimited"`
 }
 
 // KeyBillingInfo returns the token billing multiplier effective for the authenticated API key.
@@ -95,6 +99,12 @@ func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, now time.
 		PeakRateEnabled:         apiKey.Group.PeakRateEnabled,
 		EffectiveRateMultiplier: resolvedRate * appliedPeak,
 		ObservedAt:              now.UTC(),
+		Quota:                   apiKey.Quota,
+		QuotaUsed:               apiKey.QuotaUsed,
+		QuotaUnlimited:          apiKey.Quota <= 0,
+	}
+	if remaining := apiKey.GetQuotaRemaining(); remaining >= 0 {
+		response.Balance = &remaining
 	}
 	if apiKey.Group.PeakRateEnabled {
 		response.PeakStart = &apiKey.Group.PeakStart

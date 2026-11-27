@@ -24,6 +24,7 @@
               <tr class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:text-gray-400">
                 <th class="px-5 py-4 font-medium">{{ t('admin.accounts.upstreamBalances.upstreamColumn') }}</th>
                 <th class="px-5 py-4 text-right font-medium">{{ t('admin.accounts.upstreamBalances.balanceColumn') }}</th>
+                <th class="px-5 py-4 text-right font-medium">{{ t('admin.accounts.upstreamBalances.quotaColumn') }}</th>
                 <th class="px-5 py-4 font-medium">{{ t('admin.accounts.upstreamBalances.groupsColumn') }}</th>
               </tr>
             </thead>
@@ -35,7 +36,10 @@
               >
                 <td class="px-5 py-4 font-medium text-gray-900 dark:text-white">{{ item.base_url }}</td>
                 <td class="px-5 py-4 text-right tabular-nums" :class="item.has_balance ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
-                  {{ item.has_balance ? `$${(item.balance ?? 0).toFixed(2)}` : t('admin.accounts.upstreamBalances.unknown') }}
+                  {{ item.quota_unlimited ? t('admin.accounts.upstreamBalances.unlimited') : (item.has_balance ? `$${(item.balance ?? 0).toFixed(2)}` : t('admin.accounts.upstreamBalances.unknown')) }}
+                </td>
+                <td class="px-5 py-4 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                  {{ item.quota == null ? t('admin.accounts.upstreamBalances.unknown') : `$${item.quota_used?.toFixed(2) ?? '0.00'} / $${item.quota.toFixed(2)}` }}
                 </td>
                 <td class="px-5 py-4 text-gray-700 dark:text-gray-300">{{ item.groups.join(', ') || '-' }}</td>
               </tr>

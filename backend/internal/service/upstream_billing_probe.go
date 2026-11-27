@@ -173,6 +173,10 @@ type upstreamBillingProbeResponse struct {
 	EffectiveRateMultiplier *float64 `json:"effective_rate_multiplier"`
 	Timezone                *string  `json:"timezone"`
 	ObservedAt              string   `json:"observed_at"`
+	Balance                 *float64 `json:"balance"`
+	Quota                   *float64 `json:"quota"`
+	QuotaUsed               *float64 `json:"quota_used"`
+	QuotaUnlimited          *bool    `json:"quota_unlimited"`
 }
 
 // GetUpstreamBillingProbeSettings returns defaults when the setting is absent.
@@ -846,6 +850,18 @@ func parseUpstreamBillingProbeResponse(body []byte) (map[string]any, error) {
 		"peak_rate_enabled":         *response.PeakRateEnabled,
 		"effective_rate_multiplier": *response.EffectiveRateMultiplier,
 		"observed_at":               observedAt.UTC().Format(time.RFC3339Nano),
+	}
+	for key, value := range map[string]*float64{"balance": response.Balance, "quota": response.Quota, "quota_used": response.QuotaUsed} {
+		if value == nil {
+			continue
+		}
+		if *value < 0 || math.IsNaN(*value) || math.IsInf(*value, 0) {
+			return nil, fmt.Errorf("invalid %s", key)
+		}
+		data[key] = *value
+	}
+	if response.QuotaUnlimited != nil {
+		data["quota_unlimited"] = *response.QuotaUnlimited
 	}
 	if response.UserRateMultiplier != nil {
 		data["user_rate_multiplier"] = *response.UserRateMultiplier

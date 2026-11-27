@@ -1190,6 +1190,9 @@ export interface UpstreamBalanceItem {
   base_url: string
   groups: string[]
   balance?: number
+  quota?: number
+  quota_used?: number
+  quota_unlimited?: boolean
   has_balance: boolean
 }
 

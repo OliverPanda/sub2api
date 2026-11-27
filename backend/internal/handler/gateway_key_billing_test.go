@@ -67,9 +67,11 @@ func newKeyBillingContext(apiKey *service.APIKey) (*gin.Context, *httptest.Respo
 func TestGatewayHandlerKeyBillingInfoUsesGroupRate(t *testing.T) {
 	groupID := int64(7)
 	apiKey := &service.APIKey{
-		UserID:  11,
-		GroupID: &groupID,
-		Key:     "sk-sensitive-value",
+		UserID:    11,
+		GroupID:   &groupID,
+		Key:       "sk-sensitive-value",
+		Quota:     100,
+		QuotaUsed: 35,
 		Group: &service.Group{
 			ID:             groupID,
 			Name:           "private-group-name",
@@ -96,6 +98,11 @@ func TestGatewayHandlerKeyBillingInfoUsesGroupRate(t *testing.T) {
 	require.Nil(t, got.PeakRateMultiplier)
 	require.Nil(t, got.AppliedPeakMultiplier)
 	require.Equal(t, 0.75, got.EffectiveRateMultiplier)
+	require.Equal(t, 100.0, got.Quota)
+	require.Equal(t, 35.0, got.QuotaUsed)
+	require.NotNil(t, got.Balance)
+	require.Equal(t, 65.0, *got.Balance)
+	require.False(t, got.QuotaUnlimited)
 	require.Nil(t, got.Timezone)
 	require.False(t, got.ObservedAt.IsZero())
 	var fields map[string]json.RawMessage
@@ -108,6 +115,20 @@ func TestGatewayHandlerKeyBillingInfoUsesGroupRate(t *testing.T) {
 	require.NotContains(t, fields, "timezone")
 	require.NotContains(t, w.Body.String(), apiKey.Key)
 	require.NotContains(t, w.Body.String(), apiKey.Group.Name)
+}
+
+func TestGatewayHandlerKeyBillingInfoMarksUnlimitedQuota(t *testing.T) {
+	groupID := int64(7)
+	apiKey := &service.APIKey{GroupID: &groupID, Group: &service.Group{ID: groupID}}
+	c, w := newKeyBillingContext(apiKey)
+
+	newKeyBillingHandler(nil).KeyBillingInfo(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var got keyBillingInfoResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	require.True(t, got.QuotaUnlimited)
+	require.Nil(t, got.Balance)
 }
 
 func TestGatewayHandlerKeyBillingInfoUsesUserOverride(t *testing.T) {

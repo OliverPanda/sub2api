@@ -42,6 +42,8 @@ const i18n = createI18n({
             partialHint: 'Partial hint',
             receivedAt: 'Updated: {value}',
             balanceColumn: 'Balance',
+            quotaColumn: 'Used / limit',
+            unlimited: 'Unlimited',
             groupsColumn: 'Groups',
             receivedAtTitle: 'Updated',
             upstreamColumn: 'Upstream',
@@ -73,7 +75,7 @@ describe('UpstreamBalancesView', () => {
   beforeEach(() => {
     mocks.getUpstreamBalances.mockReset().mockResolvedValue({
       items: [
-        { base_url: 'https://upstream-a.example', groups: ['alpha', 'beta'], balance: 32.5, has_balance: true },
+        { base_url: 'https://upstream-a.example', groups: ['alpha', 'beta'], balance: 32.5, quota: 100, quota_used: 67.5, has_balance: true },
         { base_url: 'https://upstream-b.example', groups: [], has_balance: false }
       ]
     })

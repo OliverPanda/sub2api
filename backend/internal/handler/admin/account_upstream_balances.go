@@ -12,10 +12,13 @@ import (
 )
 
 type UpstreamBalanceEntry struct {
-	BaseURL    string   `json:"base_url"`
-	Balance    *float64 `json:"balance"`
-	HasBalance bool     `json:"has_balance"`
-	Groups     []string `json:"groups"`
+	BaseURL        string   `json:"base_url"`
+	Balance        *float64 `json:"balance"`
+	Quota          *float64 `json:"quota"`
+	QuotaUsed      *float64 `json:"quota_used"`
+	QuotaUnlimited bool     `json:"quota_unlimited"`
+	HasBalance     bool     `json:"has_balance"`
+	Groups         []string `json:"groups"`
 }
 
 type UpstreamBalancesResponse struct {
@@ -30,12 +33,13 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 	}
 
 	type aggregate struct {
-		item             UpstreamBalanceEntry
-		groups           map[string]struct{}
-		latestSnapshotAt int64
+		item     UpstreamBalanceEntry
+		groups   map[string]struct{}
+		seenKeys map[string]struct{}
 	}
 	byURL := make(map[string]*aggregate)
 	var order []string
+
 	const pageSize = 1000
 	for page, total := 1, 1; (page-1)*pageSize < total; page++ {
 		accounts, count, err := h.adminService.ListAccounts(
@@ -47,16 +51,17 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 		}
 		total = int(count)
 		for _, account := range accounts {
-			if account.Type != service.AccountTypeAPIKey {
-				continue
-			}
 			baseURL := strings.TrimRight(strings.TrimSpace(account.GetCredential("base_url")), "/")
-			if baseURL == "" {
+			if account.Type != service.AccountTypeAPIKey || baseURL == "" {
 				continue
 			}
 			a, ok := byURL[baseURL]
 			if !ok {
-				a = &aggregate{item: UpstreamBalanceEntry{BaseURL: baseURL}, groups: make(map[string]struct{})}
+				a = &aggregate{
+					item:     UpstreamBalanceEntry{BaseURL: baseURL},
+					groups:   make(map[string]struct{}),
+					seenKeys: make(map[string]struct{}),
+				}
 				byURL[baseURL] = a
 				order = append(order, baseURL)
 			}
@@ -65,17 +70,38 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 					a.groups[group.Name] = struct{}{}
 				}
 			}
+
+			apiKey := strings.TrimSpace(account.GetCredential("api_key"))
+			if apiKey != "" {
+				if _, seen := a.seenKeys[apiKey]; seen {
+					continue
+				}
+				a.seenKeys[apiKey] = struct{}{}
+			}
 			snapshot := service.DecodeUpstreamBillingProbeSnapshotPublic(account.Extra)
-			if snapshot == nil || snapshot.Status != service.UpstreamBillingProbeStatusOK || snapshot.Data == nil || snapshot.ReceivedAt == nil {
+			if snapshot == nil || snapshot.Status != service.UpstreamBillingProbeStatusOK || snapshot.Data == nil {
 				continue
 			}
-			balance, ok := snapshot.Data["balance"].(float64)
-			if !ok || math.IsNaN(balance) || math.IsInf(balance, 0) || snapshot.ReceivedAt.UnixNano() <= a.latestSnapshotAt {
-				continue
+			balance, hasBalance := finiteSnapshotNumber(snapshot.Data, "balance")
+			quota, hasQuota := finiteSnapshotNumber(snapshot.Data, "quota")
+			quotaUsed, hasQuotaUsed := finiteSnapshotNumber(snapshot.Data, "quota_used")
+			if !hasBalance && hasQuota {
+				used := quotaUsed
+				balance = math.Max(quota-used, 0)
+				hasBalance = true
 			}
-			a.item.Balance = &balance
-			a.item.HasBalance = true
-			a.latestSnapshotAt = snapshot.ReceivedAt.UnixNano()
+			if hasBalance {
+				a.item.Balance = &balance
+				a.item.HasBalance = true
+			}
+			if hasQuota {
+				a.item.Quota = &quota
+				if !hasQuotaUsed {
+					quotaUsed = 0
+				}
+				a.item.QuotaUsed = &quotaUsed
+				a.item.QuotaUnlimited, _ = snapshot.Data["quota_unlimited"].(bool)
+			}
 		}
 		if len(accounts) == 0 {
 			break
@@ -93,4 +119,9 @@ func (h *AccountHandler) GetUpstreamBalances(c *gin.Context) {
 		items = append(items, a.item)
 	}
 	response.Success(c, UpstreamBalancesResponse{Items: items})
+}
+
+func finiteSnapshotNumber(data map[string]any, key string) (float64, bool) {
+	value, ok := data[key].(float64)
+	return value, ok && value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
 }

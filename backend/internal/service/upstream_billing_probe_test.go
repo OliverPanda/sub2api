@@ -597,6 +597,22 @@ func TestUpstreamBillingProbeRejectsMissingRequiredMultiplier(t *testing.T) {
 	require.ErrorContains(t, err, "incomplete billing response")
 }
 
+func TestUpstreamBillingProbeParsesOptionalKeyQuota(t *testing.T) {
+	data, err := parseUpstreamBillingProbeResponse([]byte(`{
+		"object":"sub2api.key_billing","schema_version":1,"billing_scope":"token",
+		"group_rate_multiplier":0.8,"resolved_rate_multiplier":0.8,
+		"peak_rate_enabled":false,"effective_rate_multiplier":0.8,
+		"observed_at":"2026-07-13T01:00:00Z","quota":100,
+		"quota_used":35,"balance":65,"quota_unlimited":false
+	}`))
+
+	require.NoError(t, err)
+	require.Equal(t, float64(100), data["quota"])
+	require.Equal(t, float64(35), data["quota_used"])
+	require.Equal(t, float64(65), data["balance"])
+	require.Equal(t, false, data["quota_unlimited"])
+}
+
 func TestUpstreamBillingProbeDiscardsResultWhenIdentityChangesInFlight(t *testing.T) {
 	account := &Account{
 		ID:          19,

@@ -44,6 +44,33 @@ func TestGetUpstreamBalancesReturnsConfiguredURLsBalancesAndGroups(t *testing.T)
 	require.Equal(t, 1, svc.lastListAccounts.calls)
 }
 
+func TestGetUpstreamBalancesDerivesRemainingBalanceFromQuota(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newStubAdminService()
+	svc.accounts = []service.Account{{
+		Type:        service.AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key-a", "base_url": "https://api.example"},
+		Extra: map[string]any{service.UpstreamBillingProbeExtraKey: map[string]any{
+			"status": "ok", "data": map[string]any{"quota": 100.0, "quota_used": 35.0},
+		}},
+	}}
+	router := gin.New()
+	router.GET("/admin/accounts/upstream-balances", NewAccountHandler(svc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil).GetUpstreamBalances)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/accounts/upstream-balances", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload struct {
+		Data UpstreamBalancesResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.Len(t, payload.Data.Items, 1)
+	require.NotNil(t, payload.Data.Items[0].Balance)
+	require.Equal(t, 65.0, *payload.Data.Items[0].Balance)
+	require.Equal(t, 100.0, *payload.Data.Items[0].Quota)
+	require.Equal(t, 35.0, *payload.Data.Items[0].QuotaUsed)
+}
+
 func TestGetUpstreamBalancesLoadsAllAccountPages(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := newStubAdminService()
